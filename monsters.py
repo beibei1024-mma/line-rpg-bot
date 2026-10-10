@@ -15,7 +15,7 @@ MONSTERS = {
         "atk": 6, 
         "gold_range": (25, 150), 
         "exp": 100
-    }
+    },
     "wolf": {
         "name": "大野狼", 
         "min_hp": 100, 
@@ -23,7 +23,7 @@ MONSTERS = {
         "atk": 15, 
         "gold_range": (50, 300), 
         "exp": 200
-    }
+    },
     "hohoh": {
         "name": "大甲蟲", 
         "min_hp": 150, 
@@ -31,7 +31,7 @@ MONSTERS = {
         "atk": 20, 
         "gold_range": (100, 500), 
         "exp": 400
-    }
+    },
     "jojojo": {
         "name": "大蟒蛇", 
         "min_hp": 200, 
