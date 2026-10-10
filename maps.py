@@ -32,6 +32,9 @@ def get_maps_list_text(p):
 
 def change_map(p, target_map):
     """處理勇者切換地圖的邏輯判斷"""
+    # 🧱 【核心字串絕殺防呆】自動剃除指令字眼、切碎半角空白鍵，還原最乾淨的正牌地名！
+    target_map = target_map.replace("前往", "").replace("傳送", "").replace(" ", "").strip()
+    
     if target_map not in MAPS_DATA:
         return f"❌ 傳送失敗！地圖庫中沒有【{target_map}】這張地圖。"
         
