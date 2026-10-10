@@ -207,7 +207,7 @@ def process_game_logic(event, line_bot_api):
                 db_core.save_player(p)
                 
                 # 🔔 核心死鎖升級自動判定：若玩家剛好突破 25等、50等、100等轉職大關，自動炸出「單一本命」進階提示清單！
-                if p["level"] in:
+                if p["level"] in [25, 50, 100]:
                     job_notice = jobs.get_job_options_text(p)
                     line_bot_api.reply_message(event.reply_token, [
                         FlexSendMessage(alt_text="戰鬥結束", contents=db_core.make_battle_card(log, p, None)),
