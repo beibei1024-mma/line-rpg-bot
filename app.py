@@ -3,7 +3,9 @@ import random
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import (
+    MessageEvent, TextMessage, TextSendMessage, FlexSendMessage
+)
 
 app = Flask(__name__)
 
@@ -11,7 +13,7 @@ app = Flask(__name__)
 line_bot_api = LineBotApi(os.environ.get('LINE_CHANNEL_ACCESS_TOKEN'))
 handler = WebhookHandler(os.environ.get('LINE_CHANNEL_SECRET'))
 
-# 記憶體玩家資料（新增 "weapon" 欄位）
+# 記憶體玩家資料
 players = {}
 
 # 怪物圖鑑
@@ -50,7 +52,7 @@ def handle_message(event):
     p = players[user_id]
     reply_text = ""
 
-    # 1. 檢視狀態（顯示當前裝備）
+    # 1. 檢視狀態
     if user_msg == "我的狀態":
         w_bonus = SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in SHOP_WEAPONS else 0
         reply_text = (
@@ -62,6 +64,7 @@ def handle_message(event):
             f"金幣: 💰 {p['gold']}\n\n"
             f"💡 輸入【冒險商店】購買神兵利器！"
         )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
 
     # 2. 尋找怪物
     elif user_msg == "尋找怪物":
@@ -83,8 +86,9 @@ def handle_message(event):
                 f"🩸 怪物血量: {p['enemy']['hp']} / {p['enemy']['max_hp']}\n\n"
                 f"⚔️ 請點擊【攻擊】或輸入【逃跑】！"
             )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
 
-    # 3. 攻擊指令（加入武器傷害計算）
+    # 3. 攻擊指令
     elif user_msg == "攻擊":
         if p["hp"] <= 0:
             reply_text = "❌ 你已經陣亡了！請輸入【復活】。"
@@ -92,10 +96,7 @@ def handle_message(event):
             reply_text = "🧐 周圍空空如也，沒有怪物。點擊【尋找怪物】出發吧！"
         else:
             enemy = p["enemy"]
-            
-            # 計算武器加成
             w_bonus = SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in SHOP_WEAPONS else 0
-            # 基礎傷害 + 武器傷害
             p_dmg = random.randint(5, 12) + (p["level"] * 2) + w_bonus
             enemy["hp"] -= p_dmg
             
@@ -111,7 +112,6 @@ def handle_message(event):
                 
                 combat_log += f"🎉 擊敗了【{enemy['name']}】！\n💰 獲得金幣 +{gold_get}\n✨ 獲得經驗值 +{exp_get}\n"
                 
-                # 升級判定
                 lvl_up_need = p["level"] * 50
                 if p["exp"] >= lvl_up_need:
                     p["level"] += 1
@@ -137,19 +137,41 @@ def handle_message(event):
                         f"👾 怪物血量: {enemy['hp']} / {enemy['max_hp']}"
                     )
                 reply_text = combat_log
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
 
-    # 4. 冒險商店指令
+    # 4. 冒險商店指令（升級為精美 Flex Message 卡片）
     elif user_msg == "冒險商店":
-        reply_text = (
-            f"🏪 【村莊武器店】\n"
-            f"老闆：「客官，要買點什麼？打怪存夠錢就能換神兵喔！」\n\n"
-            f"💰 你目前擁有: {p['gold']} 金幣\n"
-            f"------------------\n"
-            f"⚔️ 1. 輸入【購買木劍】\n"
-            f"   (價格: 50金幣 / 攻擊力 +5)\n\n"
-            f"⚔️ 2. 輸入【購買鐵劍】\n"
-            f"   (價格: 150金幣 / 攻擊力 +15)\n\n"
-            f"⚠️ 注意：購買會直接替換目前裝備！"
+        flex_contents = {
+            "type": "bubble",
+            "body": {
+                "type": "box", "layout": "vertical",
+                "contents": [
+                    {"type": "text", "text": "🏪 村莊武器店", "weight": "bold", "size": "xl", "color": "#1DB446"},
+                    {"type": "text", "text": f"你目前擁有: 💰 {p['gold']} 金幣", "size": "sm", "color": "#555555", "margin": "md"},
+                    {"type": "separator", "margin": "lg"},
+                    # 商品 1：木劍
+                    {
+                        "type": "box", "layout": "horizontal", "margin": "lg", "align": "center",
+                        "contents": [
+                            {"type": "text", "text": "⚔️ 木劍 (傷害+5)", "weight": "bold", "size": "md", "flex": 3},
+                            {"type": "button", "action": {"type": "message", "label": "💰 50", "text": "購買木劍"}, "style": "primary", "color": "#E6A23C", "height": "sm", "flex": 2}
+                        ]
+                    },
+                    # 商品 2：鐵劍
+                    {
+                        "type": "box", "layout": "horizontal", "margin": "lg", "align": "center",
+                        "contents": [
+                            {"type": "text", "text": "⚔️ 鐵劍 (傷害+15)", "weight": "bold", "size": "md", "flex": 3},
+                            {"type": "button", "action": {"type": "message", "label": "💰 150", "text": "購買鐵劍"}, "style": "primary", "color": "#F56C6C", "height": "sm", "flex": 2}
+                        ]
+                    }
+                ]
+            }
+        }
+        # 使用 FlexSendMessage 發送精美卡片
+        line_bot_api.reply_message(
+            event.reply_token,
+            FlexSendMessage(alt_text="開啟了冒險商店", contents=flex_contents)
         )
 
     # 5. 購買邏輯
@@ -164,15 +186,14 @@ def handle_message(event):
             else:
                 reply_text = f"❌ 金幣不足！【{item_name}】需要 {cost} 金幣，你只有 {p['gold']} 金幣。再去多打幾隻史萊姆吧！"
         else:
-            reply_text = "❌ 本店沒有販售這項商品，請確認輸入名稱是否正確（例如：購買木劍）。"
+            reply_text = "❌ 本店沒有販售這項商品。"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
 
-    # 6. 逃跑與復活（保持原樣）
+    # 6. 逃跑與復活
     elif user_msg == "逃跑":
-        if p["enemy"] is None:
-            reply_text = "目前安全，不需要逃跑。"
-        else:
-            p["enemy"] = None
-            reply_text = "💨 成功逃跑了！"
+        p["enemy"] = None
+        reply_text = "💨 成功逃跑了！"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
     elif user_msg == "復活":
         if p["hp"] > 0:
             reply_text = "你還活著呢！"
@@ -180,10 +201,10 @@ def handle_message(event):
             p["hp"] = int(p["max_hp"] * 0.5)
             p["gold"] = max(0, p["gold"] - 20)
             reply_text = f"😇 復活成功！血量恢復至 {p['hp']}，扣除 20 金幣。"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
     else:
-        reply_text = "請點擊下方選單，或輸入【我的狀態】、【冒險商店】開始遊戲！"
-
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        reply_text = "請點擊下方選單開始遊戲！"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
 
 if __name__ == "__main__":
     app.run()
