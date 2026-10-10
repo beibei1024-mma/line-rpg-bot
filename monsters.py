@@ -19,27 +19,27 @@ MONSTER_AFFIXES = [
 MONSTERS_BASE = {
     "slime": {
         "name": "綠色史萊姆", "level": 1, "min_hp": 20, "max_hp": 30, "atk": 3, 
-        "gold_range": (10, 500), "exp": 50, "drop_item": "史萊姆黏液"
+        "gold_range": (10, 500), "exp": 500, "drop_item": "史萊姆黏液"
     },
     "goblin": {
         "name": "哥布林小偷", "level": 3, "min_hp": 45, "max_hp": 65, "atk": 7, 
-        "gold_range": (25, 1000), "exp": 100, "drop_item": "破爛的匕首"
+        "gold_range": (25, 1000), "exp": 1000, "drop_item": "破爛的匕首"
     },
     "desert_thief": {
         "name": "荒漠流浪強盜", "level": 12, "min_hp": 250, "max_hp": 350, "atk": 22, 
-        "gold_range": (200, 3000), "exp": 450, "drop_item": "強盜面罩"
+        "gold_range": (200, 3000), "exp": 4500, "drop_item": "強盜面罩"
     },
     "skeleton": {
         "name": "骷髏精英戰士", "level": 15, "min_hp": 400, "max_hp": 550, "atk": 35, 
-        "gold_range": (400, 5000), "exp": 700, "drop_item": "古老生鏽長劍"
+        "gold_range": (400, 5000), "exp": 7000, "drop_item": "古老生鏽長劍"
     },
     "dragon_guard": {
         "name": "赤焰守護飛龍", "level": 22, "min_hp": 900, "max_hp": 1200, "atk": 65, 
-        "gold_range": (800, 8000), "exp": 1500, "drop_item": "飛龍雙翼"
+        "gold_range": (800, 8000), "exp": 15000, "drop_item": "飛龍雙翼"
     },
     "dragon": {
         "name": "世界Boss・地獄紅蓮巨龍", "level": 30, "min_hp": 3500, "max_hp": 5000, "atk": 120, 
-        "gold_range": (5000, 30000), "exp": 5000, "drop_item": "巨龍逆鱗"
+        "gold_range": (5000, 30000), "exp": 50000, "drop_item": "巨龍逆鱗"
     }
 }
 
