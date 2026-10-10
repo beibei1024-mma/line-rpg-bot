@@ -193,7 +193,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                 db_core.save_player(p)
                 card = db_core.make_battle_card(log, p, None)
             else:
-                db_core.MEMORY_PLAYERS[user_id] = p
+                db_core.MEMORY_PLAYERS[event.source.user_id] = p
                 card = db_core.make_battle_card(log, p, enemy)
                 
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥回合", contents=card))
