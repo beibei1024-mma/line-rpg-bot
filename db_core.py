@@ -20,8 +20,9 @@ def load_player(user_id):
     player = cur.fetchone()
     
     if not player:
+        # 👑 【核心能力值初始化】在新玩家建立時，將原創基礎屬性：力量10、敏捷10、智力10 完美塞入資料庫！
         cur.execute(
-            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL)",
+            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10)",
             (user_id,)
         )
         conn.commit()
@@ -42,16 +43,18 @@ def save_player(p):
     conn = get_db_connection()
     cur = conn.cursor()
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
+    
+    # 👑 【核心能力值鎖存】確保更新進度時，玩家的力量、敏捷、智力同步安全鎖進 Supabase 雲端！
     cur.execute(
-        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s WHERE user_id=%s",
-        (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, p['user_id'])
+        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s WHERE user_id=%s",
+        (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p['user_id'])
     )
     conn.commit()
     cur.close()
     conn.close()
 
 def make_battle_card(title, p, enemy):
-    """【視覺史詩優化】將死板的文字戰報，包裝成具備區塊化、動態圖示的高階卡片結構"""
+    """【原創史詩優化】將死板的文字戰報，包裝成具備區塊化、動態圖示的高階卡片結構"""
     p_pct = max(0, min(100, int((p["hp"] / p["max_hp"]) * 100)))
     
     def get_bar(pct, color): 
@@ -64,7 +67,6 @@ def make_battle_card(title, p, enemy):
     contents = []
     
     # ⚔️ 1. 頂部動態戰報日誌區
-    # 判斷是否內含「擊敗對手」的文字，如果有，自動將頂部換成金色勝利徽章
     if "擊敗對手" in title:
         header_color = "#FFD700"
         header_title = "🏆 🟢 戰鬥大獲全勝 🟢 🏆"
@@ -75,13 +77,13 @@ def make_battle_card(title, p, enemy):
     contents.append({"type": "text", "text": header_title, "weight": "bold", "size": "md", "color": header_color, "align": "center"})
     contents.append({"type": "separator", "margin": "lg"})
     
-    # 📝 2. 戰報詳細日誌內容區（支援換行與重點文字上色）
+    # 📝 2. 戰報詳細日誌內容區
     log_text = title.replace("\n", " \n ")
     contents.append({
         "type": "text", "text": log_text, "size": "sm", "color": "#333333", "wrap": True, "margin": "lg", "lineSpacing": "xxl"
     })
     
-    # 👾 3. 敵方怪物血條區（若怪物未陣亡則顯示）
+    # 👾 3. 敵方怪物血條區
     if enemy: 
         e_pct = max(0, min(100, int((enemy["hp"] / enemy["max_hp"]) * 100)))
         contents.extend([
