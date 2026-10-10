@@ -80,7 +80,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊【復活】重整旗鼓。"))
             return
         if p["enemy"] is not None:
-            line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card("⚔️ 你的眼前還卡著一隻怪！請專心應戰！", p, p["enemy"])))
+            # 💯 【真・安全防彈純文字格式】直接改用 TextSendMessage，100% 繞過 LINE 官方所有 Flex 格式審查地雷！
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚔️ 你的眼前還卡著一隻怪！請專心應戰（輸入【攻擊】揮刀，或輸入【逃跑】）！"))
             return
         current_location = p.get("current_map", "新手村")
         random_monster = monsters.generate_random_monster(current_location)
