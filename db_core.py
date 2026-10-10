@@ -20,9 +20,9 @@ def load_player(user_id):
     player = cur.fetchone()
     
     if not player:
-        # 👑 【核心能力值初始化】在新玩家建立時，將原創基礎屬性：力量10、敏捷10、智力10 完美塞入資料庫！
+        # 👑 【原創六大天賦初始化】新玩家建立時，將力量10、敏捷10、智力10、體力10、幸運10、精神10 完美塞入資料庫！
         cur.execute(
-            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10)",
+            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10)",
             (user_id,)
         )
         conn.commit()
@@ -44,18 +44,24 @@ def save_player(p):
     cur = conn.cursor()
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
     
-    # 👑 【核心能力值鎖存】確保更新進度時，玩家的力量、敏捷、智力同步安全鎖進 Supabase 雲端！
+    # 👑 【原創六大天賦鎖存】確保更新進度時，玩家的六大基礎屬性同步安全鎖進 Supabase 雲端！
     cur.execute(
-        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s WHERE user_id=%s",
-        (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p['user_id'])
+        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s WHERE user_id=%s",
+        (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
+         p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p['user_id'])
     )
     conn.commit()
     cur.close()
     conn.close()
 
 def make_battle_card(title, p, enemy):
-    """【原創史詩優化】將死板的文字戰報，包裝成具備區塊化、動態圖示的高階卡片結構"""
-    p_pct = max(0, min(100, int((p["hp"] / p["max_hp"]) * 100)))
+    """【原創視覺優化】將死板的文字戰報，包裝成具備區塊化、動態圖示的高階卡片結構"""
+    # 體力動態影響血量上限公式對齊
+    level = p.get("level", 1)
+    vit_val = p.get("vitality", 10 + (level * 3))
+    calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
+    
+    p_pct = max(0, min(100, int((p["hp"] / calculated_max_hp) * 100)))
     
     def get_bar(pct, color): 
         return {
@@ -63,7 +69,6 @@ def make_battle_card(title, p, enemy):
             "contents": [{"type": "box", "layout": "vertical", "backgroundColor": color, "width": f"{pct}%", "height": "10px", "cornerRadius": "5px"}]
         }
                 
-    # 🌟 基礎容器排版
     contents = []
     
     # ⚔️ 1. 頂部動態戰報日誌區
@@ -97,7 +102,7 @@ def make_battle_card(title, p, enemy):
     contents.extend([
         {"type": "separator", "margin": "lg"}, 
         {"type": "text", "text": f"👤 勇者進度 (Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
-        {"type": "text", "text": f"血量狀態: {p['hp']} / {p['max_hp']}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
+        {"type": "text", "text": f"血量狀態: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
         get_bar(p_pct, "#4CD964")
     ])
     
