@@ -2,7 +2,7 @@ import random
 import json
 from linebot.models import TextSendMessage, FlexSendMessage
 
-# 🎮 跨檔案導入你全新優化、功能完美獨立分開的 8 大黃金頁面
+# 🎮 跨檔案導入你全新優化、完全模組化分離的 9 大黃金頁面
 import db_core
 import player
 import monsters
@@ -10,6 +10,7 @@ import weapons
 import shop
 import bag
 import maps
+import jobs
 
 def process_game_logic(event, line_bot_api):
     user_id = event.source.user_id
@@ -18,14 +19,28 @@ def process_game_logic(event, line_bot_api):
     # 從資料庫核心讀取玩家與記憶體快取資料
     p = db_core.load_player(user_id)
     level = p.get("level", 1)
+    current_job = p.get("job", "初心者")
+    if current_job not in jobs.JOBS_DATA:
+        current_job = "初心者"
+        p["job"] = "初心者"
+        
+    job_mod = jobs.JOBS_DATA[current_job]
 
-    # 🧮 【原創六大天賦實體衍生數值公式計算】
-    str_val = p.get("strength", 10 + (level * 3))
-    agi_val = p.get("agility", 10 + (level * 2))
-    int_val = p.get("intelligence", 10 + (level * 2))
-    vit_val = p.get("vitality", 10 + (level * 3))
-    luk_val = p.get("luck", 10 + (level * 1))
-    men_val = p.get("sprit", 10 + (level * 2))
+    # 🧮 【原創六大天賦實體衍生數值公式計算 - 完美吃進職業乘數加成】
+    base_str = p.get("strength", 10 + (level * 3))
+    base_agi = p.get("agility", 10 + (level * 2))
+    base_int = p.get("intelligence", 10 + (level * 2))
+    base_vit = p.get("vitality", 10 + (level * 3))
+    base_luk = p.get("luck", 10 + (level * 1))
+    base_men = p.get("sprit", 10 + (level * 2))
+    
+    # 乘上職業加成倍率
+    str_val = int(base_str * job_mod["str_mod"])
+    agi_val = int(base_agi * job_mod["agi_mod"])
+    int_val = int(base_int * job_mod["int_mod"])
+    vit_val = int(base_vit * job_mod["vit_mod"])
+    luk_val = int(base_luk * job_mod["luk_mod"])
+    men_val = int(base_men * job_mod["men_mod"])
     
     w_bonus = weapons.SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in weapons.SHOP_WEAPONS else 0
 
@@ -41,7 +56,7 @@ def process_game_logic(event, line_bot_api):
     elif user_msg == "世界地圖":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps.get_maps_list_text(p)))
         
-    # 4. 處理【前往 / 傳送】全新原創世界地圖指令判定
+    # 4. 處理【前往 / 傳送】指令判定
     elif user_msg.startswith("前往") or user_msg.startswith("傳送"):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps.change_map(p, user_msg)))
         
@@ -59,7 +74,34 @@ def process_game_logic(event, line_bot_api):
         item = user_msg.replace("購買", "").strip()
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=shop.buy_weapon(p, item)))
         
-    # 8. 處理【尋找怪物】判定
+    # 8. 處理【轉職】天賦覺醒指令核心判定
+    elif user_msg.startswith("轉職"):
+        target_job = user_msg.replace("轉職", "").strip()
+        
+        if target_job not in jobs.JOBS_DATA:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 轉職失敗！秘法圖鑑中不存在【{target_job}】這個職業。"))
+            return
+            
+        target_info = jobs.JOBS_DATA[target_job]
+        
+        # 🛡️ 驗證一：是否在當前職業的可轉分支列表中
+        if target_job not in job_mod["next_jobs"]:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 轉職失敗！你目前的職業是【{current_job}】，無法直接跨系轉職為【{target_job}】。"))
+            return
+            
+        # 🛡️ 驗證二：等級門檻限制
+        if p["level"] < target_info["req_lvl"]:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔒 實力不足！轉職為【{target_job}】需要達到 Lv.{target_info['req_lvl']}+，你目前只有 Lv.{p['level']}。"))
+            return
+            
+        # 🔓 雙重驗證通過！執行雲端覺醒轉職
+        p["job"] = target_job
+        db_core.save_player(p)
+        
+        log_text = f"✨ 🎉 【轉職成功】 🎉 ✨\n勇者，你成功通過了命運的考驗，天賦血脈完全覺醒！\n\n🛡️ 你從【{current_job}】正式晉升為全新的職業——🔥【{target_job}】！\n六大屬性加成倍率已全面刷新，專屬強大能力已全線附加！快輸入【我的狀態】查看全新神力面板！"
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="轉職成功", contents=db_core.make_battle_card(log_text, p, None)))
+
+    # 9. 處理【尋找怪物】判定
     elif user_msg == "尋找怪物" or user_msg == "尋怪":
         if p["hp"] <= 0:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊【復活】重整旗鼓。"))
@@ -78,7 +120,7 @@ def process_game_logic(event, line_bot_api):
         title_log = f"⚠️ 警報！你在📍【{current_location}】遭遇強敵！\n當前天象：【{env_now}】\n怪物能力：🔰 {random_monster['skill']}"
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card(title_log, p, p["enemy"])))
         
-    # 9. 處理【攻擊】包含「物理/魔法傷害起伏、敏捷連擊與閃避、幸運爆擊」的原創天賦回合判定
+    # 10. 處理【攻擊】判定
     elif user_msg == "攻擊":
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法攻擊（可能已陣亡或周圍沒有怪物）。"))
@@ -87,27 +129,26 @@ def process_game_logic(event, line_bot_api):
         enemy = p["enemy"]
         log = ""
         
-        # 🧮 基礎機率計算對齊
-        crit_chance = min(80, 10 + (luk_val // 5)) / 100.0          # 爆擊率
-        crit_dmg_mod = 1.5 + (luk_val * 0.005)                     # 爆擊傷害倍率
-        evade_chance = min(50, 5 + (agi_val // 8)) / 100.0          # 閃避率
-        double_atk_chance = min(60, 2 + (agi_val // 6)) / 100.0     # 連擊率
+        # 🧮 基礎機率公式計算對齊
+        crit_chance = min(80, 10 + (luk_val // 5)) / 100.0          
+        crit_dmg_mod = 1.5 + (luk_val * 0.005)                     
+        evade_chance = min(50, 5 + (agi_val // 8)) / 100.0          
+        double_atk_chance = min(60, 2 + (agi_val // 6)) / 100.0     
         
-        # 🎲 判定本次攻擊是否為「連續攻擊」
+        # 🎲 敏捷連續攻擊判定
         is_double_atk = random.random() < double_atk_chance
         attack_count = 2 if is_double_atk else 1
         
         if is_double_atk:
-            log += f"🌪️ 🚀 【神速連擊】！！你身形化為疾風，觸發連續攻擊判定！\n"
+            log += f"🌪️ 🚀 【神速連擊】！！你身形化為疾風，發動了雙重連續攻擊！\n"
             
         total_p_dmg = 0
         for i in range(attack_count):
-            # 💪 力量影響：計算最大跟最小物理傷害起伏
             min_p_dmg = 5 + (str_val // 2) + w_bonus
             max_p_dmg = 12 + str_val + w_bonus
             p_dmg = random.randint(min_p_dmg, max_p_dmg)
             
-            # 🍀 幸運影響：爆擊率判定
+            # 🍀 幸運爆擊率與爆傷判定
             is_crit = random.random() < crit_chance
             if is_crit:
                 p_dmg = int(p_dmg * crit_dmg_mod)
@@ -116,41 +157,39 @@ def process_game_logic(event, line_bot_api):
                 log += f"⚔️ 第 {i+1} 刀物理命中，造成 {p_dmg} 點傷害！\n"
             total_p_dmg += p_dmg
             
-        # 實體扣減怪物血量
         enemy["hp"] -= total_p_dmg
         
         # ── 檢查怪物是否死亡 ──
         if enemy["hp"] <= 0:
-            # 🔮 智力影響：計算最大跟最小魔法傷害作為最終一擊
+            # 🔮 智力最終一擊魔法附加傷害
             min_m_dmg = 3 + (int_val // 2)
             max_m_dmg = 10 + int_val
             m_dmg = random.randint(min_m_dmg, max_m_dmg)
             
             gold_mod = p.get("map_gold_mod", 1.0)
-            base_gold = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
+            base_gold = random.randint(enemy["gold_range"], enemy["gold_range"])
             final_gold = int(base_gold * gold_mod)
             
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
             p["enemy"] = None
             
-            log += f"✨ 🔮 智力共鳴！最終引導魔法追加轟炸，造成 {m_dmg} 點魔傷！\n"
+            log += f"✨ 🔮 智力附加！最終凝聚魔法追加爆轟，造成 {m_dmg} 點魔傷！\n"
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}"
             if gold_mod > 1.0:
                 log += f" (含天象加成 {int((gold_mod-1)*100)}%)"
             log += f"、經驗值 +{enemy['exp']}！\n"
             
-            # 🎲 50% 機率隨機掉落怪物素材
             if random.random() < 0.50 and enemy.get("drop_item"):
                 bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
                 log += f"💎 【幸運掉寶】！搜刮到了素材：【{enemy['drop_item']}】x1！\n"
                 
-            # 升級判定與六大屬性固定分配成長
+            # 👑 【升級觸發自動判定與職業口令喚醒】
             if p["exp"] >= p["level"] * 50:
                 p["exp"] -= p["level"] * 50
                 p["level"] += 1
                 
-                # 🛡️ 體力影響：自動提升基礎體力與計算全新血量上限
+                # 六大屬性固定成長
                 p["strength"] = p.get("strength", 10) + 3
                 p["agility"] = p.get("agility", 10) + 2
                 p["intelligence"] = p.get("intelligence", 10) + 2
@@ -158,27 +197,42 @@ def process_game_logic(event, line_bot_api):
                 p["luck"] = p.get("luck", 10) + 1
                 p["sprit"] = p.get("sprit", 10) + 2
                 
-                # 動態重新計算最大生命值
-                calculated_max_hp = 100 + (p["vitality"] * 5) + (p["level"] * 15)
+                # 重新動態核算血量上限
+                new_vit = int(p["vitality"] * job_mod["vit_mod"])
+                calculated_max_hp = 100 + (new_vit * 5) + (p["level"] * 15)
                 p["max_hp"] = calculated_max_hp
                 p["hp"] = calculated_max_hp
-                log += f"🎊 👑 恭喜升級到 Lv.{p['level']}！六大天賦全屬性大幅提升，血量已完全補滿！"
+                
+                log += f"🎊 👑 恭喜升級到 Lv.{p['level']}！全屬性大幅提升，血量完全補滿！"
+                db_core.save_player(p)
+                
+                # 🔔 關鍵自動判定：若玩家剛好突破 25等、50等、100等轉職大關，自動在聊天室炸出轉職清單！
+                if p["level"] in [25, 50, 100] or (p["level"] > 25 and job_mod["tier"] == 0) or (p["level"] > 50 and job_mod["tier"] == 1) or (p["level"] > 100 and job_mod["tier"] == 2):
+                    job_notice = jobs.get_job_options_text(p["job"])
+                    line_bot_api.reply_message(event.reply_token, [
+                        FlexSendMessage(alt_text="戰鬥結束", contents=db_core.make_battle_card(log, p, None)),
+                        TextSendMessage(text=job_notice)
+                    ])
+                    return
                 
             db_core.save_player(p)
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥結束", contents=db_core.make_battle_card(log, p, None)))
         else:
             # ── 怪物沒死，發動反擊 ──
-            # ⚡ 敏捷影響：計算戰場閃避率
             is_p_evade = random.random() < evade_chance
             
             if is_p_evade:
-                log += f"💨 殘影！你發動神級閃避身法，【完美閃避】了怪物的反擊傷害！"
+                log += f"💨 殘影！你發動敏捷身法，【完美閃避】了怪物的反擊傷害！"
             else:
                 dmg_mod = p.get("map_dmg_mod", 1.0)
                 base_m_atk = random.randint(1, enemy["atk"])
                 final_m_atk = int(base_m_atk * dmg_mod)
                 
-                # 🛡️ 體力影響：物理防禦力實體扣減反擊傷害（最少受 1 點傷害）
+                # 🧱 體力影響防禦力扣減
+                p_defense = vit_val // 2
+                final_received_dmg = max(1, final_m_atk - p_defense)
+                
+                p["hp"] -= final_received_dmg
                 p_defense = vit_val // 2
                 final_received_dmg = max(1, final_m_atk - p_defense)
                 
@@ -186,31 +240,31 @@ def process_game_logic(event, line_bot_api):
                 log += f"🩹 【{enemy['name']}】發動反擊！你受到 {final_received_dmg} 點物理傷害！"
                 if p_defense > 0:
                     log += f" (體力防禦減免 -{p_defense} 點)"
-                if dmg_mod > 1.0:
-                    log += f" (含天象加成)"
             
-            if p["hp"] <= 0:
+                if p["hp"] <= 0:
                 p["hp"] = 0
                 p["enemy"] = None
                 log += "\n💀 你受傷過重被擊倒了！請點擊【復活】重整旗鼓。"
                 db_core.save_player(p)
                 card = db_core.make_battle_card(log, p, None)
             else:
-                # ⚔️ 普通回合：快取高速秒回
                 db_core.MEMORY_PLAYERS[user_id] = p
                 card = db_core.make_battle_card(log, p, enemy)
                 
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥回合", contents=card))
             
-    # 10. 處理【逃跑】判定
+    # 11. 處理【逃跑】判定
     elif user_msg == "逃跑":
         p["enemy"] = None
         db_core.save_player(p)
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💨 成功逃跑了！"))
         
-    # 11. 處理【復活】判定
+    # 12. 處理【復活】判定
     elif user_msg == "復活":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=player.handle_resurrect(p)))
         
     else:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請點擊下方選單開始遊戲！"))
+
+if __name__ == "__main__":
+    app.run()
