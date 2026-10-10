@@ -22,6 +22,7 @@ MONSTERS = {
 SHOP_WEAPONS = {"木劍": {"price": 50, "atk_bonus": 5}, "鐵劍": {"price": 150, "atk_bonus": 15}}
 
 def get_db_connection():
+    import base64
     secret_code = "cG9zdGdyZXNxbDovL3Bvc3RncmVzLnVod2pxaGR4ZHpuZGxqYnNqYml4OjJUSzE5N2tYRzE3YWdGSlVAYXdzLTAtYXAtbm9ydGhlYXN0LTIucG9vbGVyLnN1cGFiYXNlLmNvbTo2NTQzL3Bvc3RncmVzP3NzbG1vZGU9cmVxdWlyZQ=="
     db_url = base64.b64decode(secret_code).decode('utf-8')
     return psycopg2.connect(db_url)
