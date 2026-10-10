@@ -71,7 +71,7 @@ def process_game_logic(event, line_bot_api):
         
         if enemy["hp"] <= 0:
             # 🏆 擊敗對手判定：強制跨海寫入 Supabase 資料庫鎖定高額金幣，防回溯！
-            gold_get = random.randint(enemy["gold_range"], enemy["gold_range"])
+            gold_get = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
             p["gold"] += gold_get
             p["exp"] += enemy["exp"]
             p["enemy"] = None
