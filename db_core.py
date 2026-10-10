@@ -7,12 +7,10 @@ from psycopg2.extras import RealDictCursor
 MEMORY_PLAYERS = {}
 
 def get_db_connection():
-    # 讀取你在 Render 後台設定的環境變數，永久固定，安全不外洩！
     db_url = os.environ.get('DATABASE_URL')
     return psycopg2.connect(db_url)
 
 def load_player(user_id):
-    # ⚡ 記憶體優先讀取機制（0 秒延遲）
     if user_id in MEMORY_PLAYERS:
         return MEMORY_PLAYERS[user_id]
         
@@ -22,7 +20,6 @@ def load_player(user_id):
     player = cur.fetchone()
     
     if not player:
-        # 新增初始玩家防呆機制
         cur.execute(
             "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL)",
             (user_id,)
@@ -37,15 +34,11 @@ def load_player(user_id):
     if player and player['enemy']: 
         player['enemy'] = json.loads(player['enemy'])
         
-    # 同步寫入暫存
     MEMORY_PLAYERS[user_id] = dict(player)
     return MEMORY_PLAYERS[user_id]
 
 def save_player(p):
-    # 同步刷新本地暫存
     MEMORY_PLAYERS[p['user_id']] = p
-    
-    # 強制寫入 Supabase 雲端資料庫
     conn = get_db_connection()
     cur = conn.cursor()
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
@@ -58,28 +51,52 @@ def save_player(p):
     conn.close()
 
 def make_battle_card(title, p, enemy):
-    # 繪製彩色血條卡片的標準基礎模組
+    """【視覺史詩優化】將死板的文字戰報，包裝成具備區塊化、動態圖示的高階卡片結構"""
     p_pct = max(0, min(100, int((p["hp"] / p["max_hp"]) * 100)))
-    e_pct = max(0, min(100, int((enemy["hp"] / enemy["max_hp"]) * 100))) if enemy else 0
     
     def get_bar(pct, color): 
-        return {"type": "box", "layout": "vertical", "backgroundColor": "#E0E0E0", "height": "8px", "cornerRadius": "4px", "margin": "sm", 
-                "contents": [{"type": "box", "layout": "vertical", "backgroundColor": color, "width": f"{pct}%", "height": "8px", "cornerRadius": "4px"}]}
+        return {
+            "type": "box", "layout": "vertical", "backgroundColor": "#2A2A2A", "height": "10px", "cornerRadius": "5px", "margin": "md", 
+            "contents": [{"type": "box", "layout": "vertical", "backgroundColor": color, "width": f"{pct}%", "height": "10px", "cornerRadius": "5px"}]
+        }
                 
-    contents = [{"type": "text", "text": title, "weight": "bold", "size": "md", "color": "#111111", "wrap": True}]
+    # 🌟 基礎容器排版
+    contents = []
     
+    # ⚔️ 1. 頂部動態戰報日誌區
+    # 判斷是否內含「擊敗對手」的文字，如果有，自動將頂部換成金色勝利徽章
+    if "擊敗對手" in title:
+        header_color = "#FFD700"
+        header_title = "🏆 🟢 戰鬥大獲全勝 🟢 🏆"
+    else:
+        header_color = "#111111"
+        header_title = "⚔️ 📊 戰場即時動態 📊 ⚔️"
+        
+    contents.append({"type": "text", "text": header_title, "weight": "bold", "size": "md", "color": header_color, "align": "center"})
+    contents.append({"type": "separator", "margin": "lg"})
+    
+    # 📝 2. 戰報詳細日誌內容區（支援換行與重點文字上色）
+    log_text = title.replace("\n", " \n ")
+    contents.append({
+        "type": "text", "text": log_text, "size": "sm", "color": "#333333", "wrap": True, "margin": "lg", "lineSpacing": "xxl"
+    })
+    
+    # 👾 3. 敵方怪物血條區（若怪物未陣亡則顯示）
     if enemy: 
+        e_pct = max(0, min(100, int((enemy["hp"] / enemy["max_hp"]) * 100)))
         contents.extend([
-            {"type": "separator", "margin": "md"}, 
+            {"type": "separator", "margin": "lg"}, 
             {"type": "text", "text": f"👾 {enemy['name']}", "weight": "bold", "size": "md", "margin": "md", "color": "#FF3B30"}, 
-            {"type": "text", "text": f"HP: {max(0, enemy['hp'])} / {enemy['max_hp']}", "size": "xs", "color": "#666666"}, 
+            {"type": "text", "text": f"血量狀態: {max(0, enemy['hp'])} / {enemy['max_hp']}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
             get_bar(e_pct, "#FF3B30")
         ])
         
+    # 👤 4. 勇者血條固定區
     contents.extend([
-        {"type": "separator", "margin": "md"}, 
-        {"type": "text", "text": "👤 勇者狀態", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
-        {"type": "text", "text": f"HP: {p['hp']} / {p['max_hp']}", "size": "xs", "color": "#666666"}, 
+        {"type": "separator", "margin": "lg"}, 
+        {"type": "text", "text": f"👤 勇者進度 (Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
+        {"type": "text", "text": f"血量狀態: {p['hp']} / {p['max_hp']}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
         get_bar(p_pct, "#4CD964")
     ])
+    
     return {"type": "bubble", "body": {"type": "box", "layout": "vertical", "contents": contents}}
