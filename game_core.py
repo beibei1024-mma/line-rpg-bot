@@ -2,13 +2,14 @@ import random
 import json
 from linebot.models import TextSendMessage, FlexSendMessage
 
-# 🎮 跨檔案導入你其他的專屬遊戲資料庫
+# 🎮 跨檔案導入你全新大分散、高效率的各個專屬遊戲頁面
 import db_core
 import player
 import monsters
 import weapons
 import shop
-import maps_bag
+import bag
+import maps
 
 def process_game_logic(event, line_bot_api):
     user_id = event.source.user_id
@@ -21,20 +22,24 @@ def process_game_logic(event, line_bot_api):
     if user_msg == "我的狀態":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=player.get_status_text(p)))
         
-    # 2. 處理【我的背包】判定
+    # 2. 處理【我的背包】判定（精準連接到全新的 bag.py 頁面）
     elif user_msg == "我的背包":
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps_bag.get_bag_text(p)))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=bag.get_bag_text(p)))
         
-    # 3. 處理【冒險商店】判定
+    # 3. 處理【世界地圖】判定（精準連接到全新的 maps.py 頁面）
+    elif user_msg == "世界地圖":
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps.get_maps_list_text(p)))
+        
+    # 4. 處理【冒險商店】判定
     elif user_msg == "冒險商店":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟商店", contents=shop.get_shop_card(p)))
         
-    # 4. 處理【購買物品】判定
+    # 5. 處理【購買物品】判定
     elif user_msg.startswith("購買"):
         item = user_msg.replace("購買", "").strip()
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=shop.buy_weapon(p, item)))
         
-    # 5. 處理【尋找怪物】判定
+    # 6. 處理【尋找怪物】判定
     elif user_msg == "尋找怪物":
         if p["hp"] <= 0:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊【復活】。"))
@@ -52,7 +57,7 @@ def process_game_logic(event, line_bot_api):
         db_core.save_player(p)
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card("⚠️ 野生怪物出現了！", p, p["enemy"])))
         
-    # 6. 處理【攻擊與回合傷害】判定
+    # 7. 處理【攻擊與回合傷害】判定
     elif user_msg == "攻擊":
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法攻擊（可能已陣亡或周圍沒有怪物）。"))
@@ -66,7 +71,7 @@ def process_game_logic(event, line_bot_api):
         
         if enemy["hp"] <= 0:
             # 🏆 擊敗對手判定：強制跨海寫入 Supabase 資料庫鎖定高額金幣，防回溯！
-            gold_get = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
+            gold_get = random.randint(enemy["gold_range"], enemy["gold_range"])
             p["gold"] += gold_get
             p["exp"] += enemy["exp"]
             p["enemy"] = None
@@ -101,13 +106,13 @@ def process_game_logic(event, line_bot_api):
                 
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥回合", contents=card))
             
-    # 7. 處理【逃跑】判定
+    # 8. 處理【逃跑】判定
     elif user_msg == "逃跑":
         p["enemy"] = None
         db_core.save_player(p)
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💨 成功逃跑了！"))
         
-    # 8. 處理【復活】判定
+    # 9. 處理【復活】判定
     elif user_msg == "復活":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=player.handle_resurrect(p)))
         
