@@ -91,7 +91,7 @@ def make_battle_card(title, p, enemy):
     contents.append({"type": "separator", "margin": "lg"})
     
     # 📝 2. 戰報詳細日誌內容區
-    log_text = title.replace("\n", " \n ")
+    log_text = str(title).replace("\n", " \n ")
     contents.append({
         "type": "text", "text": log_text, "size": "sm", "color": "#333333", "wrap": True, "margin": "lg", "lineSpacing": "xxl"
     })
