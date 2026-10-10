@@ -12,23 +12,28 @@ from linebot.models import (
 
 app = Flask(__name__)
 
+# 讀取 LINE 與 Render 的環境變數
 line_bot_api = LineBotApi(os.environ.get('LINE_CHANNEL_ACCESS_TOKEN'))
 handler = WebhookHandler(os.environ.get('LINE_CHANNEL_SECRET'))
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
+# 遊戲怪物圖鑑設定
 MONSTERS = {
     "slime": {"name": "綠色史萊姆", "min_hp": 20, "max_hp": 20, "atk": 3, "gold_range": (10, 20), "exp": 10},
     "goblin": {"name": "哥布林小偷", "min_hp": 45, "max_hp": 45, "atk": 6, "gold_range": (25, 40), "exp": 25}
 }
 
+# 商店武器圖鑑設定 (名稱, 價格, 攻擊力加成)
 SHOP_WEAPONS = {
     "木劍": {"price": 50, "atk_bonus": 5},
     "鐵劍": {"price": 150, "atk_bonus": 15}
 }
 
+# 建立與 Supabase 雲端資料庫的連線
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, sslmode='require')
 
+# 從資料庫撈取或建立玩家資料
 def load_player(user_id):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -36,6 +41,7 @@ def load_player(user_id):
     player = cur.fetchone()
     
     if not player:
+        # 如果是第一次加入的新玩家，自動在雲端建立初始帳號
         cur.execute(
             "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL)",
             (user_id,)
@@ -47,10 +53,12 @@ def load_player(user_id):
     cur.close()
     conn.close()
     
+    # 轉換資料庫中儲存的怪物文字為 Python 字典格式
     if player and player['enemy']:
         player['enemy'] = json.loads(player['enemy'])
     return dict(player)
 
+# 儲存玩家最新進度回 Supabase 資料庫
 def save_player(p):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -63,6 +71,7 @@ def save_player(p):
     cur.close()
     conn.close()
 
+# 自動繪製彩色戰鬥血條卡片（Flex Message）的輔助函式
 def make_battle_card(title, p, enemy):
     p_percent = max(0, min(100, int((p["hp"] / p["max_hp"]) * 100)))
     e_percent = max(0, min(100, int((enemy["hp"] / enemy["max_hp"]) * 100))) if enemy else 0
@@ -104,24 +113,27 @@ def handle_message(event):
     user_id = event.source.user_id
     user_msg = event.message.text.strip()
 
+    # 自動從雲端下載該玩家的存檔資料
     p = load_player(user_id)
 
+    # 1. 處理【我的狀態】指令
     if user_msg == "我的狀態":
         w_bonus = SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in SHOP_WEAPONS else 0
         reply_text = (
             f"👤 【勇者狀態】\n"
             f"等級: Lv.{p['level']}\n"
             f"血量: {p['hp']} / {p['max_hp']}\n"
-            f"裝裝備: ⚔️ {p['weapon']} (傷害+{w_bonus})\n"
+            f"裝備: ⚔️ {p['weapon']} (傷害+{w_bonus})\n"
             f"經驗值: {p['exp']} / {p['level'] * 50}\n"
             f"金幣: 💰 {p['gold']}\n\n"
             f"💡 輸入【冒險商店】購買神兵利器！"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
 
+    # 2. 處理【尋找怪物】指令
     elif user_msg == "尋找怪物":
         if p["hp"] <= 0:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊【復活】。"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊【復活】來重整旗鼓。"))
             return
         if p["enemy"] is not None:
             card = make_battle_card(f"⚔️ 你的眼前還卡著一隻怪！請專心應戰！", p, p["enemy"])
@@ -136,10 +148,11 @@ def handle_message(event):
             "name": m_template["name"], "hp": m_hp, "max_hp": m_hp, "atk": m_template["atk"],
             "gold_range": m_template["gold_range"], "exp": m_template["exp"]
         }
-        save_player(p)
+        save_player(p) # 儲存遭遇怪物的狀態到雲端
         card = make_battle_card(f"⚠️ 森林深處傳來咆哮！野生怪物出現了！", p, p["enemy"])
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=card))
 
+    # 3. 處理【攻擊】指令
     elif user_msg == "攻擊":
         if p["hp"] <= 0:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊【復活】。"))
@@ -171,7 +184,7 @@ def handle_message(event):
                 p["hp"] = p["max_hp"]
                 log += f"\n🎊 恭喜升級到 Lv.{p['level']}！HP已補滿！"
             
-            save_player(p)
+            save_player(p) # 獲勝後自動雲端存檔進度
             card = make_battle_card(log, p, None)
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥結束", contents=card))
         else:
@@ -187,9 +200,10 @@ def handle_message(event):
             else:
                 card = make_battle_card(log, p, enemy)
                 
-            save_player(p)
+            save_player(p) # 每回合戰鬥後自動雲端存檔
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥回合", contents=card))
 
+    # 4. 處理【冒險商店】指令
     elif user_msg == "冒險商店":
         flex_contents = {
             "type": "bubble",
@@ -212,6 +226,7 @@ def handle_message(event):
         }
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟了冒險商店", contents=flex_contents))
 
+    # 5. 處理【購買武器】邏輯
     elif user_msg.startswith("購買"):
         item_name = user_msg.replace("購買", "").strip()
         if item_name in SHOP_WEAPONS:
@@ -223,15 +238,24 @@ def handle_message(event):
             else:
                 reply_text = f"❌ 金幣不足！還差 {cost - p['gold']} 金幣。"
         else:
-            reply_text = "❌ 本店沒有販售這項商品。"
-        save_player(p)
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
-
+    reply_text = "❌ 本店沒有販售這項商品。"
+    save_player(p) # 交易成功後自動存檔
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+    # 6. 處理【逃跑】與【復活】指令
     elif user_msg == "逃跑":
-        p["enemy"] = None
-        save_player(p)
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💨 成功逃跑了！"))
+    p["enemy"] = None
+    save_player(p)
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💨 成功逃跑了！"))
     elif user_msg == "復活":
-        if p["hp"] > 0:
-            reply_text = "你還活著呢！"
-        else:
+    if p["hp"] > 0:
+    reply_text = "你還活著呢！"
+    else:
+    p["hp"] = int(p["max_hp"] * 0.5)
+    p["gold"] = max(0, p["gold"] - 20)
+    reply_text = f"😇 復活成功！血量恢復至 {p['hp']}，扣除 20 金幣。"
+    save_player(p) # 復活成功後自動雲端存檔
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+    else:
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請點擊下方選單開始遊戲！"))
+    if name == "main":
+    app.run()
