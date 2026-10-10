@@ -30,8 +30,8 @@ SHOP_WEAPONS = {
 
 # 建立與 Supabase 雲端資料庫的連線（精準寫死 Pooler IPv4 網址，100% 防呆防錯）
 def get_db_connection():
-    fixed_url = "postgresql://postgres.uhwqhdxzdnzdljbsjbix:2TK197kXG17agFjU@://supabase.com"
-    return psycopg2.connect(fixed_url)
+    return psycopg2.connect("postgresql://postgres.uhwqhdxzdnzdljbsjbix:2TK197kXG17agFjU@://supabase.com")
+
 
 # 從資料庫撈取或建立玩家資料
 def load_player(user_id):
