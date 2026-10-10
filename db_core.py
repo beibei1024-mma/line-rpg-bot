@@ -20,9 +20,9 @@ def load_player(user_id):
     player = cur.fetchone()
     
     if not player:
-        # 👑 【原創六大天賦初始化】新玩家建立時，將力量10、敏捷10、智力10、體力10、幸運10、精神10 完美塞入資料庫！
+        # 👑 【核心職業與天賦初始化】新玩家建立時，將力量10、敏捷10、智力10、體力10、幸運10、精神10 且職業為「初心者」完美塞入！
         cur.execute(
-            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10)",
+            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者')",
             (user_id,)
         )
         conn.commit()
@@ -44,11 +44,11 @@ def save_player(p):
     cur = conn.cursor()
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
     
-    # 👑 【原創六大天賦鎖存】確保更新進度時，玩家的六大基礎屬性同步安全鎖進 Supabase 雲端！
+    # 👑 【核心職業與天賦鎖存】確保更新進度時，玩家的職業與六大天賦同步安全鎖進 Supabase 雲端！
     cur.execute(
-        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s WHERE user_id=%s",
+        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s WHERE user_id=%s",
         (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
-         p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p['user_id'])
+         p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p['user_id'])
     )
     conn.commit()
     cur.close()
@@ -56,9 +56,14 @@ def save_player(p):
 
 def make_battle_card(title, p, enemy):
     """【原創視覺優化】將死板的文字戰報，包裝成具備區塊化、動態圖示的高階卡片結構"""
-    # 體力動態影響血量上限公式對齊
+    # 導入職業與體力動態影響血量上限公式
+    import jobs
     level = p.get("level", 1)
-    vit_val = p.get("vitality", 10 + (level * 3))
+    current_job = p.get("job", "初心者")
+    job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
+    
+    base_vit = p.get("vitality", 10 + (level * 3))
+    vit_val = int(base_vit * job_mod["vit_mod"])
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     
     p_pct = max(0, min(100, int((p["hp"] / calculated_max_hp) * 100)))
@@ -75,6 +80,9 @@ def make_battle_card(title, p, enemy):
     if "擊敗對手" in title:
         header_color = "#FFD700"
         header_title = "🏆 🟢 戰鬥大獲全勝 🟢 🏆"
+    elif "轉職成功" in title:
+        header_color = "#00FF66"
+        header_title = "✨ 🛡️ 天賦覺醒轉職 🛡️ ✨"
     else:
         header_color = "#111111"
         header_title = "⚔️ 📊 戰場即時動態 📊 ⚔️"
@@ -101,7 +109,7 @@ def make_battle_card(title, p, enemy):
     # 👤 4. 勇者血條固定區
     contents.extend([
         {"type": "separator", "margin": "lg"}, 
-        {"type": "text", "text": f"👤 勇者進度 (Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
+        {"type": "text", "text": f"👤 勇者狀態 ({current_job} Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
         {"type": "text", "text": f"血量狀態: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
         get_bar(p_pct, "#4CD964")
     ])
