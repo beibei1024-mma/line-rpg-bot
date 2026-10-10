@@ -10,8 +10,8 @@ line_bot_api = LineBotApi(os.environ.get('LINE_CHANNEL_ACCESS_TOKEN'))
 handler = WebhookHandler(os.environ.get('LINE_CHANNEL_SECRET'))
 
 MONSTERS = {
-    "slime": {"name": "綠色史萊姆", "min_hp": 20, "max_hp": 20, "atk": 3, "gold_range": (10, 20), "exp": 10},
-    "goblin": {"name": "哥布林小偷", "min_hp": 45, "max_hp": 45, "atk": 6, "gold_range": (25, 40), "exp": 25}
+    "slime": {"name": "綠色史萊姆", "min_hp": 20, "max_hp": 20, "atk": 3, "gold_range": (10, 500), "exp": 50},
+    "goblin": {"name": "哥布林小偷", "min_hp": 45, "max_hp": 45, "atk": 6, "gold_range": (25, 1000), "exp": 100}
 }
 SHOP_WEAPONS = {"木劍": {"price": 50, "atk_bonus": 5}, "鐵劍": {"price": 150, "atk_bonus": 15}}
 
@@ -92,7 +92,7 @@ def handle_message(event):
         enemy["hp"] -= p_dmg
         log = f"💥 你揮舞【{p['weapon']}】對【{enemy['name']}】造成 {p_dmg} 點傷害！\n"
         if enemy["hp"] <= 0:
-            gold_get = random.randint(enemy["gold_range"], enemy["gold_range"])
+            gold_get = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
             p["gold"] += gold_get; p["exp"] += enemy["exp"]; p["enemy"] = None
             log += f"🎉 擊敗對手！獲得金幣 +{gold_get}、經驗值 +{enemy['exp']}！"
             if p["exp"] >= p["level"] * 50:
