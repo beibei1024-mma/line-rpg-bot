@@ -2,14 +2,14 @@ import random
 import json
 from linebot.models import TextSendMessage, FlexSendMessage
 
-# 🎮 跨檔案導入你全新大分散、功能完美解耦的各個專屬遊戲頁面
+# 🎮 跨檔案導入您全新大分散、功能完美解耦的各個專屬遊戲頁面
 import db_core
 import player
 import shop
 import bag
 import maps
 
-# ⚔️ 導入你全新分流出去的「第二部分專屬頁面：戰鬥核心大腦」
+# ⚔️ 導入您全新分流出去的「第二部分專屬頁面：戰鬥與養成核心大腦」
 import battle_core
 
 def process_game_logic(event, line_bot_api):
@@ -57,6 +57,6 @@ def process_game_logic(event, line_bot_api):
         return
 
     # 8. 處理【加點 / 配點 / 轉職 / 尋怪 / 攻擊】
-    # ⚡ 核心分流最高指標：行數即將超標！大腦直接打包，一秒全自動轉交給第二部分專屬頁面處理！
+    # ⚡ 核心分流最高指標：大腦直接打包，全自動轉交給第二部分專屬頁面處理！
     else:
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg)
