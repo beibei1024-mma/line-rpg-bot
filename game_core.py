@@ -186,7 +186,8 @@ def process_game_logic(event, line_bot_api):
             m_dmg = random.randint(min_m_dmg, max_m_dmg)
             
             gold_mod = p.get("map_gold_mod", 1.0)
-            base_gold = random.randint(enemy["gold_range"], enemy["gold_range"])
+            # 💯 【真・黃金絕殺防呆】精準抓取元組的第一位和第二位，徹底消滅 TypeError 地雷！
+            base_gold = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
             final_gold = int(base_gold * gold_mod)
             
             p["gold"] += final_gold
