@@ -16,7 +16,7 @@ MONSTERS = {
 SHOP_WEAPONS = {"木劍": {"price": 50, "atk_bonus": 5}, "鐵劍": {"price": 150, "atk_bonus": 15}}
 
 def get_db_connection():
-        return psycopg2.connect("postgresql://postgres.uhwqhdxzdnzdljbsjbix:2TK197kXG17agFjU@://supabase.com")
+    return psycopg2.connect("postgresql://postgres.uhwqhdxzdnzdljbsjbix:2TK197kXG17agFjU@://supabase.com")
 
 def load_player(user_id):
     conn = get_db_connection()
