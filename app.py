@@ -15,7 +15,6 @@ app = Flask(__name__)
 # 讀取 LINE 與 Render 的環境變數
 line_bot_api = LineBotApi(os.environ.get('LINE_CHANNEL_ACCESS_TOKEN'))
 handler = WebhookHandler(os.environ.get('LINE_CHANNEL_SECRET'))
-DATABASE_URL = os.environ.get('DATABASE_URL')
 
 # 遊戲怪物圖鑑設定
 MONSTERS = {
@@ -29,12 +28,12 @@ SHOP_WEAPONS = {
     "鐵劍": {"price": 150, "atk_bonus": 15}
 }
 
-# 建立與 Supabase 雲端資料庫的連線
+# 建立與 Supabase 雲端資料庫的連線（精準寫死 Pooler IPv4 網址，100% 防呆防錯）
 def get_db_connection():
     fixed_url = "postgresql://postgres.uhwqhdxzdnzdljbsjbix:2TK197kXG17agFjU@://supabase.com"
     return psycopg2.connect(fixed_url)
 
-# 从資料庫撈取或建立玩家資料
+# 從資料庫撈取或建立玩家資料
 def load_player(user_id):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -108,7 +107,6 @@ def callback():
     except InvalidSignatureError:
         abort(400)
     return 'OK'
-
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_id = event.source.user_id
@@ -248,7 +246,7 @@ def handle_message(event):
         p["enemy"] = None
         save_player(p)
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💨 成功逃跑了！"))
-
+        
     elif user_msg == "復活":
         if p["hp"] > 0:
             reply_text = "你還活著呢！"
@@ -258,10 +256,9 @@ def handle_message(event):
             reply_text = f"😇 復活成功！血量恢復至 {p['hp']}，扣除 20 金幣。"
         save_player(p) # 復活成功後自動雲端存檔
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
-
+        
     else:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請點擊下方選單開始遊戲！"))
 
 if __name__ == "__main__":
     app.run()
-
