@@ -201,16 +201,22 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                 
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥結束", contents=db_core.make_battle_card(log, p, None)))
         else:
+            # 🔮 先算好怪物本次反擊的基礎破壞力，確保下方變數 100% 存在，消滅 NameError！
+            dmg_mod = p.get("map_dmg_mod", 1.0)
+            base_m_atk = random.randint(1, enemy["atk"])
+            final_m_atk = int(base_m_atk * dmg_mod)
+
             is_p_evade = random.random() < evade_chance
-            if is_p_evade:
-                log += f"💨 殘影！你發動敏捷身法，【完美閃避】了怪物的反擊傷害！"
-            else:
-                dmg_mod = p.get("map_dmg_mod", 1.0)
-                base_m_atk = random.randint(1, enemy["atk"])
-                p_defense = vit_val // 2
-                final_received_dmg = max(1, final_m_atk - p_defense)
-                p["hp"] -= final_received_dmg
-                log += f"🩹 【{enemy['name']}】發動反擊！你受到 {final_received_dmg} 點物理傷害！"
+         if is_p_evade:
+             log += f"💨 殘影！你發動敏捷身法，【完美閃避】了怪物的反擊傷害！"
+         else:
+             p_defense = vit_val // 2
+             final_received_dmg = max(1, final_m_atk - p_defense)
+             p["hp"] -= final_received_dmg
+             log += f"🩹 【{enemy['name']}】發動反擊！你受到 {final_received_dmg} 點物理傷害！"
+             if p_defense > 0:
+                 log += f" (體力防禦減免 -{p_defense} 點)"
+
             
             if p["hp"] <= 0:
                 p["hp"] = 0
