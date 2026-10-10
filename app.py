@@ -31,7 +31,9 @@ SHOP_WEAPONS = {
 
 # 建立與 Supabase 雲端資料庫的連線
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL)
+    import os
+    db_url = os.environ.get('DATABASE_URL')
+    return psycopg2.connect(db_url)
 
 # 从資料庫撈取或建立玩家資料
 def load_player(user_id):
