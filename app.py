@@ -18,7 +18,8 @@ players = {}
 # 怪物圖鑑
 MONSTERS = {
     "slime": {"name": "綠色史萊姆", "min_hp": 15, "max_hp": 25, "atk": 3, "gold_range": (5, 15), "exp": 10},
-    "goblin": {"name": "哥布林小偷", "min_hp": 30, "max_hp": 45, "atk": 6, "gold_range": (15, 30), "exp": 25}
+    "goblin": {"name": "哥布林", "min_hp": 30, "max_hp": 45, "atk": 6, "gold_range": (15, 30), "exp": 25}
+    "Reinforced goblin": {"name": "強化哥布林", "min_hp": 60, "max_hp": 90, "atk": 10, "gold_range": (30, 60), "exp": 50}
 }
 
 @app.route("/callback", methods=['POST'])
