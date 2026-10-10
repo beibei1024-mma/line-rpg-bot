@@ -44,7 +44,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔒 境界未到！轉職為【{target_job}】需要突破至 Lv.{target_info['req_lvl']}+。"))
             return
             
-        # 🔓 驗證完全通過！變更職業並解除卡關狀態
         p["job"] = target_job
         db_core.save_player(p)
         log_text = f"✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 你從【{current_job}】正式進階為更高的職業形態——🔥【{target_job}】！\n專屬天賦加成已全線翻倍刷新！卡關狀態已解除，快輸入【我的狀態】查看全新戰力！"
@@ -52,7 +51,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         return
 
     # 🚨 【真・轉職卡關防呆強制判定】
-    # 只要玩家達到轉職臨界點卻尚未轉職，一律死鎖所有尋怪與攻擊功能，強制要求其手動輸入口令覺醒！
     if (p["level"] == 25 and job_mod["tier"] == 0) or (p["level"] == 50 and job_mod["tier"] == 1) or (p["level"] == 100 and job_mod["tier"] == 2):
         if user_msg in ["尋找怪物", "尋怪", "攻擊"]:
             job_notice = jobs.get_job_options_text(p)
@@ -99,7 +97,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         db_core.save_player(p)
         env_now = p.get("map_env_status", "🟢 平靜")
         title_log = f"⚠️ 警報！你在📍【{current_location}】遭遇強敵！\n當前天象：【{env_now}】\n怪物能力：🔰 {random_monster['skill']}"
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card(title_log, p, p["enemy"])))
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card(title_log, p, random_monster)))
 
     # D. 處理【攻擊】判定
     elif user_msg == "攻擊":
@@ -153,12 +151,14 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             log += f"✨ 🔮 智力附加！最終凝聚魔法追加爆轟，造成 {m_dmg} 點魔傷！\n"
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n"
             
-            # While 連續升級公式 - 加入 25等、50等、100等強制死鎖熔斷判定！
+            if random.random() < 0.50 and enemy.get("drop_item"):
+                bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
+                log += f"💎 【幸運掉寶】！搜刮到了素材：【{enemy['drop_item']}】x1！\n"
+                
             while p["exp"] >= p["level"] * 50:
-                # 🛡️ 觸發熔斷：若即將突破轉職大關，強制將等級卡死在臨界點，不准多升一級！
                 if p["level"] == 24 and job_mod["tier"] == 0:
                     p["level"] = 25
-                    p["exp"] = 0  # 溢出的經驗暫時扣留，作為轉職考驗
+                    p["exp"] = 0
                     log += f"\n突破！你的等級已卡死在 Lv.25 轉職臨界點！請先手動完成天賦轉職！"
                     break
                 elif p["level"] == 49 and job_mod["tier"] == 1:
@@ -191,7 +191,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             
             db_core.save_player(p)
             
-            # 當前剛好達到卡關點，同一回合自動噴出任務圖鑑
             if (p["level"] == 25 and job_mod["tier"] == 0) or (p["level"] == 50 and job_mod["tier"] == 1) or (p["level"] == 100 and job_mod["tier"] == 2):
                 job_notice = jobs.get_job_options_text(p)
                 line_bot_api.reply_message(event.reply_token, [
@@ -210,7 +209,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                 base_m_atk = random.randint(1, enemy["atk"])
                 p_defense = vit_val // 2
                 final_received_dmg = max(1, final_m_atk - p_defense)
-                
                 p["hp"] -= final_received_dmg
                 log += f"🩹 【{enemy['name']}】發動反擊！你受到 {final_received_dmg} 點物理傷害！"
             
