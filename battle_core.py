@@ -11,7 +11,9 @@ import jobs
 def process_battle_logic(event, line_bot_api, p, user_msg):
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
-    job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
+    if current_job not in jobs.JOBS_DATA:
+        current_job = "初心者"
+    job_mod = jobs.JOBS_DATA[current_job]
 
     # 🧮 六大屬性實體公式連動
     base_str = p.get("strength", 10 + (level * 3))
@@ -82,6 +84,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         db_core.save_player(p)
         reply_log = f"💪 🧪 【配點成功】 🧪 💪\n你成功將 {pts_to_add} 點潛能自由點數，分配給了──✨【{attr_name}】屬性！\n\n🔹 剩餘未分配點數：{p['attribute_points']} 點。"
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="配點成功", contents=db_core.make_battle_card(reply_log, p, None)))
+        return
 
     # C. 處理【尋找怪物】判定
     elif user_msg == "尋找怪物" or user_msg == "尋怪":
@@ -98,7 +101,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         env_now = p.get("map_env_status", "🟢 平靜")
         title_log = f"⚠️ 警報！你在📍【{current_location}】遭遇強敵！\n當前天象：【{env_now}】\n怪物能力：🔰 {random_monster['skill']}"
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card(title_log, p, random_monster)))
-
+        return
     # D. 處理【攻擊】判定
     elif user_msg == "攻擊":
         if p["hp"] <= 0 or p["enemy"] is None:
@@ -141,6 +144,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             m_dmg = random.randint(min_m_dmg, max_m_dmg)
             
             gold_mod = p.get("map_gold_mod", 1.0)
+            # 💰 【真・黃金絕殺解包】精準對齊 0 與 1 索引，彻底封印 TypeError 地雷！
             base_gold = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
             final_gold = int(base_gold * gold_mod)
             
@@ -201,22 +205,21 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                 
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥結束", contents=db_core.make_battle_card(log, p, None)))
         else:
-            # 🔮 先算好怪物本次反擊的基礎破壞力，確保下方變數 100% 存在，消滅 NameError！
+            # ── 👑 怪物反擊判定：將反擊破壞力前置定義，完美封印 NameError 縮排地雷！ ──
             dmg_mod = p.get("map_dmg_mod", 1.0)
             base_m_atk = random.randint(1, enemy["atk"])
             final_m_atk = int(base_m_atk * dmg_mod)
-
+            
             is_p_evade = random.random() < evade_chance
-         if is_p_evade:
-             log += f"💨 殘影！你發動敏捷身法，【完美閃避】了怪物的反擊傷害！"
-         else:
-             p_defense = vit_val // 2
-             final_received_dmg = max(1, final_m_atk - p_defense)
-             p["hp"] -= final_received_dmg
-             log += f"🩹 【{enemy['name']}】發動反擊！你受到 {final_received_dmg} 點物理傷害！"
-             if p_defense > 0:
-                 log += f" (體力防禦減免 -{p_defense} 點)"
-
+            if is_p_evade:
+                log += f"💨 殘影！你發動敏捷身法，【完美閃避】了怪物的反擊傷害！"
+            else:
+                p_defense = vit_val // 2
+                final_received_dmg = max(1, final_m_atk - p_defense)
+                p["hp"] -= final_received_dmg
+                log += f"🩹 【{enemy['name']}】發動反擊！你受到 {final_received_dmg} 點物理傷害！"
+                if p_defense > 0:
+                    log += f" (體力防禦減免 -{p_defense} 點)"
             
             if p["hp"] <= 0:
                 p["hp"] = 0
