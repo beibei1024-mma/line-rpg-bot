@@ -143,7 +143,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             m_dmg = random.randint(min_m_dmg, max_m_dmg)
             
             gold_mod = p.get("map_gold_mod", 1.0)
-            base_gold = random.randint(enemy["gold_range"], enemy["gold_range"])
+            base_gold = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
             final_gold = int(base_gold * gold_mod)
             
             p["gold"] += final_gold
