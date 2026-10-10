@@ -2,7 +2,7 @@ import random
 import json
 from linebot.models import TextSendMessage, FlexSendMessage
 
-# 🎮 跨檔案導入你全新優化、功能完美解耦的 8 大黃金頁面
+# 🎮 跨檔案導入你全新優化、完全模組化分離的 8 大黃金頁面
 import db_core
 import player
 import monsters
@@ -30,10 +30,9 @@ def process_game_logic(event, line_bot_api):
     elif user_msg == "世界地圖":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps.get_maps_list_text(p)))
         
-    # 4. 處理【傳送】新地圖指令判定
-    elif user_msg.startswith("傳送"):
-        target_map = user_msg.replace("傳送", "").strip()
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps.change_map(p, target_map)))
+    # 4. 處理【前往 / 傳送】全新編年史地標地圖指令判定（100% 對齊前端橫向按鈕）
+    elif user_msg.startswith("前往") or user_msg.startswith("傳送"):
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps.change_map(p, user_msg)))
         
     # 5. 處理【使用】藥水道具指令判定
     elif user_msg.startswith("使用"):
@@ -49,8 +48,8 @@ def process_game_logic(event, line_bot_api):
         item = user_msg.replace("購買", "").strip()
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=shop.buy_weapon(p, item)))
         
-    # 8. 處理【尋找怪物】動態詞綴與地圖綁定隨機判定
-    elif user_msg == "尋找怪物":
+    # 8. 處理【尋找怪物】根據據點動態孵化隨機怪物
+    elif user_msg == "尋找怪物" or user_msg == "尋怪":
         if p["hp"] <= 0:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊【復活】重整旗鼓。"))
             return
@@ -58,18 +57,19 @@ def process_game_logic(event, line_bot_api):
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card(f"⚔️ 你的眼前還卡著一隻怪！請專心應戰！", p, p["enemy"])))
             return
             
-        # 🎲 啟動優化：根據玩家當前的 current_map 欄位，從獨立怪物庫中生成全新隨機怪物
-        current_location = p.get("current_map", "新手村")
+        # 🎲 根據玩家當前的精密據點（若無欄位預設晨曦堡壘），從獨立怪物庫中生成對應強度的強敵
+        current_location = p.get("current_map", "晨曦堡壘")
         random_monster = monsters.generate_random_monster(current_location)
         
         p["enemy"] = random_monster
         # 尋找怪物算大事件，強制跨海寫入 Supabase 連線存檔
         db_core.save_player(p)
         
-        title_log = f"⚠️ 警報！你在【{current_location}】遭遇了強敵！\n怪物被動技能：🔰 {random_monster['skill']}"
+        env_now = p.get("map_env_status", "🟢 平靜")
+        title_log = f"⚠️ 警報！你在📍【{current_location}】遭遇強敵！\n當前天象：【{env_now}】\n怪物能力：🔰 {random_monster['skill']}"
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card(title_log, p, p["enemy"])))
         
-    # 9. 處理【攻擊】含有「暴擊、閃避、隨機掉寶、材料入庫」的史詩級回合判定
+    # 9. 處理【攻擊】融入「蝕潮傷害、金幣加成」的史詩級回合判定
     elif user_msg == "攻擊":
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法攻擊（可能已陣亡或周圍沒有怪物）。"))
@@ -78,12 +78,12 @@ def process_game_logic(event, line_bot_api):
         enemy = p["enemy"]
         w_bonus = weapons.SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in weapons.SHOP_WEAPONS else 0
         
-        # 🎲 隨機機制優化 1：計算勇者是否觸發 15% 暴擊機率
+        # 🎲 計算勇者是否觸發 15% 暴擊
         is_p_crit = random.random() < 0.15
         base_dmg = random.randint(5, 12) + (p["level"] * 2) + w_bonus
         p_dmg = int(base_dmg * 1.5) if is_p_crit else base_dmg
         
-        # 🎲 隨機機制優化 2：計算怪物是否觸發 10% 閃避機率
+        # 🎲 計算怪物是否觸發 10% 閃避
         is_m_evade = random.random() < 0.10
         
         log = ""
@@ -92,22 +92,30 @@ def process_game_logic(event, line_bot_api):
         else:
             enemy["hp"] -= p_dmg
             if is_p_crit:
-                log += f"💥 🔥 🌟 【致命暴擊】！！你揮舞【{p['weapon']}】對【{enemy['name']}】造成高達 {p_dmg} 點破壞性傷害！\n"
+                log += f"💥 🔥 🌟 【致命暴擊】！！你揮舞【{p['weapon']}】對【{enemy['name']}】造成高達 {p_dmg} 點傷害！\n"
             else:
                 log += f"⚔️ 命中！你對【{enemy['name']}】造成 {p_dmg} 點傷害！\n"
                 
         # ── 檢查怪物是否死亡 ──
         if enemy["hp"] <= 0:
-            gold_get = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
-            p["gold"] += gold_get
+            # 🔮 讀取地圖天象的金幣加成倍率（若無預設為 1.0）
+            gold_mod = p.get("map_gold_mod", 1.0)
+            base_gold = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
+            final_gold = int(base_gold * gold_mod)
+            
+            p["gold"] += final_gold
             p["exp"] += enemy["exp"]
             p["enemy"] = None
-            log += f"🎉 順利擊敗對手！獲得金幣 +{gold_get}、經驗值 +{enemy['exp']}！\n"
             
-            # 🎲 隨機機制優化 3：50% 機率隨機掉落怪物專屬素材戰利品，送進雲端背包
+            log += f"🎉 擊敗對手！獲得金幣 +{final_gold}"
+            if gold_mod > 1.0:
+                log += f" (含天象加成 {int((gold_mod-1)*100)}%)"
+            log += f"、經驗值 +{enemy['exp']}！\n"
+            
+            # 🎲 50% 機率隨機掉落怪物素材送進背包
             if random.random() < 0.50 and enemy.get("drop_item"):
                 bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
-                log += f"💎 【幸運掉寶】！你從怪物屍體上搜刮到了素材：【{enemy['drop_item']}】x1！\n"
+                log += f"💎 【幸編年史掉寶】！搜刮到了素材：【{enemy['drop_item']}】x1！\n"
                 
             # 升級判定
             if p["exp"] >= p["level"] * 50:
@@ -115,27 +123,31 @@ def process_game_logic(event, line_bot_api):
                 p["level"] += 1
                 p["max_hp"] += 15
                 p["hp"] = p["max_hp"]
-                log += f"🎊 👑 恭喜突破極限升級到 Lv.{p['level']}！最大HP提升，血量已完全補滿！"
+                log += f"🎊 👑 恭喜升級到 Lv.{p['level']}！血量已完全補滿！"
                 
             # 打死怪算最高級大事件，強制連線鎖進雲端
             db_core.save_player(p)
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥結束", contents=db_core.make_battle_card(log, p, None)))
         else:
             # ── 怪物沒死，發動反擊 ──
-            m_atk = random.randint(1, enemy["atk"])
-            p["hp"] -= m_atk
-            log += f"🩹 【{enemy['name']}】發動反擊！你受到 {m_atk} 點傷害！"
+            # 🔮 讀取地圖天象的怪物傷害加成倍率（若無預設為 1.0）
+            dmg_mod = p.get("map_dmg_mod", 1.0)
+            base_m_atk = random.randint(1, enemy["atk"])
+            final_m_atk = int(base_m_atk * dmg_mod)
+            
+            p["hp"] -= final_m_atk
+            log += f"🩹 【{enemy['name']}】發動反擊！你受到 {final_m_atk} 點傷害！"
+            if dmg_mod > 1.0:
+                log += f" (內含蝕潮環境增幅 {int((dmg_mod-1)*100)}%)"
             
             if p["hp"] <= 0:
                 p["hp"] = 0
                 p["enemy"] = None
                 log += "\n💀 你受傷過重被擊倒了！請點擊【復活】重整旗鼓。"
-                # 陣亡算大事件，強制寫入雲端
                 db_core.save_player(p)
                 card = db_core.make_battle_card(log, p, None)
             else:
-                # ⚔️ 互毆扣血回合：只留在 Render 當地記憶體更新，完全不連線資料庫！
-                # 體感速度狂飆至 0.01 秒，LINE 訊息瞬間秒噴出來！
+                # ⚔️ 普通回合：留在記憶體高速快取，0.01 秒秒噴卡片！
                 db_core.MEMORY_PLAYERS[user_id] = p
                 card = db_core.make_battle_card(log, p, enemy)
                 
