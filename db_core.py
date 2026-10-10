@@ -93,7 +93,7 @@ def make_battle_card(title, p, enemy):
     # 📝 2. 戰報詳細日誌內容區
     log_text = str(title).replace("\n", " \n ")
     contents.append({
-        "type": "text", "text": log_text, "size": "sm", "color": "#333333", "wrap": True, "margin": "lg", "lineSpacing": "xxl"
+        "type": "text", "text": log_text, "size": "sm", "color": "#333333", "wrap": True, "margin": "lg"
     })
     
     # 👾 3. 敵方怪物血條區
