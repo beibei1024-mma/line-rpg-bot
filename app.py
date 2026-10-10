@@ -111,7 +111,7 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_id = event.source.user_id
-    user_msg = event.message.text.strip()
+    user_msg = event.message.text.replace(" ", "").strip()
 
     # 自動從雲端下載該玩家的存檔資料
     p = load_player(user_id)
