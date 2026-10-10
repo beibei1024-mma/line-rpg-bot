@@ -1,27 +1,23 @@
-# 🎭 遊戲六大體系、三階轉職大數據庫
-# 屬性加成倍率：當計算戰鬥數據時，會直接乘以該職業的專屬百分比加成！
+# 🎭 遊戲六大本命體系、一線到底三階死鎖升階大數據庫
+# 階級限制：初心者(0) -> 25等一轉(1) -> 50等二轉(2) -> 100等三轉(3)
 JOBS_DATA = {
     "初心者": {
         "tier": 0, "req_lvl": 1, "next_jobs": ["戰士", "騎士", "魔法師", "盜賊", "祭師", "弓箭手"],
         "str_mod": 1.0, "agi_mod": 1.0, "int_mod": 1.0, "vit_mod": 1.0, "luk_mod": 1.0, "men_mod": 1.0,
-        "skills": {
-            "普通攻擊": {"type": "active", "mp_cost": 0, "desc": "基礎揮砍，造成物理傷害。"}
-        }
+        "skills": {"普通攻擊": {"type": "active", "mp_cost": 0, "desc": "基礎揮砍，造成物理傷害。"}}
     },
     
-    # ⚔️ 戰士體系
+    # ⚔️ 1. 戰士本命升階線 (戰士 -> 狂戰士 -> 修羅)
     "戰士": {
         "tier": 1, "req_lvl": 25, "next_jobs": ["狂戰士"],
         "str_mod": 1.3, "agi_mod": 1.0, "int_mod": 0.7, "vit_mod": 1.1, "luk_mod": 1.0, "men_mod": 0.9,
-        "skills": {
-            "蓄力重擊": {"type": "active", "mp_cost": 15, "desc": "💪 力量凝聚一擊！造成物理基礎傷害 1.6 倍的巨額傷害！"}
-        }
+        "skills": {"蓄力重擊": {"type": "active", "mp_cost": 15, "desc": "💪 力量凝聚一擊！造成物理基礎傷害 1.6 倍的巨額傷害！"}}
     },
     "狂戰士": {
         "tier": 2, "req_lvl": 50, "next_jobs": ["修羅"],
         "str_mod": 1.7, "agi_mod": 1.2, "int_mod": 0.5, "vit_mod": 0.9, "luk_mod": 1.3, "men_mod": 0.6,
         "skills": {
-            "蓄力重擊": {"type": "active", "mp_cost": 15, "desc": "💪 力量凝聚一擊！造成物理基礎傷害 1.6 倍 the 巨額傷害！"},
+            "蓄力重擊": {"type": "active", "mp_cost": 15, "desc": "💪 力量凝聚一擊！造成物理基礎傷害 1.6 倍的巨額傷害！"},
             "血性狂暴": {"type": "passive", "desc": "🩸 狂暴被動：血量低於 50% 時，爆擊傷害額外飆升 50%！"}
         }
     },
@@ -34,13 +30,11 @@ JOBS_DATA = {
         }
     },
 
-    # 🛡️ 騎士體系
+    # 🛡️ 2. 騎士本命升階線 (騎士 -> 十字軍 -> 督軍)
     "騎士": {
         "tier": 1, "req_lvl": 25, "next_jobs": ["十字軍"],
         "str_mod": 1.1, "agi_mod": 0.9, "int_mod": 0.8, "vit_mod": 1.4, "luk_mod": 0.9, "men_mod": 1.1,
-        "skills": {
-            "鋼鐵防壁": {"type": "passive", "desc": "🧱 騎士被動：物理防禦力額外增幅 30 點！"}
-        }
+        "skills": {"鋼鐵防壁": {"type": "passive", "desc": "🧱 騎士被動：物理防禦力額外增幅 30 點！"}}
     },
     "十字軍": {
         "tier": 2, "req_lvl": 50, "next_jobs": ["督軍"],
@@ -60,13 +54,11 @@ JOBS_DATA = {
         }
     },
 
-    # 🔮 魔法師體系
+    # 🔮 3. 魔法師本命升階線 (魔法師 -> 魔導士 -> 元素使)
     "魔法師": {
         "tier": 1, "req_lvl": 25, "next_jobs": ["魔導士"],
         "str_mod": 0.5, "agi_mod": 1.0, "int_mod": 1.4, "vit_mod": 0.8, "luk_mod": 1.0, "men_mod": 1.3,
-        "skills": {
-            "火球術": {"type": "active", "mp_cost": 25, "desc": "🔥 消耗 25 魔力，轟出智力倍率 1.8 倍的致命高額魔法傷害！"}
-        }
+        "skills": {"火球術": {"type": "active", "mp_cost": 25, "desc": "🔥 消耗 25 魔力，轟出智力倍率 1.8 倍的致命高額魔法傷害！"}}
     },
     "魔導士": {
         "tier": 2, "req_lvl": 50, "next_jobs": ["元素使"],
@@ -86,13 +78,11 @@ JOBS_DATA = {
         }
     },
 
-    # 🗡️ 盜賊體系
+    # 🗡️ 4. 盜賊本命升階線 (盜賊 -> 刺客 -> 暗夜行者)
     "盜賊": {
         "tier": 1, "req_lvl": 25, "next_jobs": ["刺客"],
         "str_mod": 1.0, "agi_mod": 1.4, "int_mod": 0.6, "vit_mod": 0.9, "luk_mod": 1.3, "men_mod": 0.8,
-        "skills": {
-            "伏擊雙刺": {"type": "passive", "desc": "🌪️ 盜賊被動：戰場連續攻擊機率額外暴增 20%！"}
-        }
+        "skills": {"伏擊雙刺": {"type": "passive", "desc": "🌪️ 盜賊被動：戰場連續攻擊機率額外暴增 20%！"}}
     },
     "刺客": {
         "tier": 2, "req_lvl": 50, "next_jobs": ["暗夜行者"],
@@ -112,13 +102,11 @@ JOBS_DATA = {
         }
     },
 
-    # ⛪ 祭師體系
+    # ⛪ 5. 祭師本命升階線 (祭師 -> 賢者 -> 大主教)
     "祭師": {
         "tier": 1, "req_lvl": 25, "next_jobs": ["賢者"],
         "str_mod": 0.8, "agi_mod": 0.9, "int_mod": 1.2, "vit_mod": 1.1, "luk_mod": 1.1, "men_mod": 1.4,
-        "skills": {
-            "治癒術": {"type": "active", "mp_cost": 20, "desc": "💖 聖光降臨！消耗 20 魔力，隨機為勇者補回智力與精神總和 1.5 倍的生命值！"}
-        }
+        "skills": {"治癒術": {"type": "active", "mp_cost": 20, "desc": "💖 聖光降臨！消耗 20 魔力，隨機為勇者補回智力與精神總和 1.5 倍的生命值！"}}
     },
     "賢者": {
         "tier": 2, "req_lvl": 50, "next_jobs": ["大主教"],
@@ -138,13 +126,11 @@ JOBS_DATA = {
         }
     },
 
-    # 🏹 弓箭手體系
+    # 🏹 6. 弓箭手本命升階線 (弓箭手 -> 獵人 -> 遊俠)
     "弓箭手": {
         "tier": 1, "req_lvl": 25, "next_jobs": ["獵人"],
         "str_mod": 1.1, "agi_mod": 1.3, "int_mod": 0.7, "vit_mod": 0.9, "luk_mod": 1.2, "men_mod": 0.8,
-        "skills": {
-            "二連矢": {"type": "active", "mp_cost": 15, "desc": "🏹 箭步神速！消耗 15 魔力，必定射出兩箭物理穿透傷害！"}
-        }
+        "skills": {"二連矢": {"type": "active", "mp_cost": 15, "desc": "🏹 箭步神速！消耗 15 魔力，必定射出兩箭物理穿透傷害！"}}
     },
     "獵人": {
         "tier": 2, "req_lvl": 50, "next_jobs": ["遊俠"],
@@ -165,27 +151,38 @@ JOBS_DATA = {
     }
 }
 
-def get_job_options_text(current_job):
-    """當玩家達到轉職等級時，動態生成完全原創的職業任務選單字串"""
+def get_job_options_text(p):
+    """【死鎖判定】根據勇者目前的單一職業，動態精準計算出下一階專屬本命升階提示，防呆防跨系！"""
+    current_job = p.get("job", "初心者")
+    level = p.get("level", 1)
+    
     job_info = JOBS_DATA.get(current_job, JOBS_DATA["初心者"])
     next_list = job_info["next_jobs"]
     
     if not next_list:
-        return "👑 勇者！你目前已經達到了該職業鏈的最終至尊職業，實力已傲視天際！"
+        return f"👑 傳奇大巔峰！你目前已經晉升為最終神職【{current_job}】，實力已傲視凡塵！"
         
-    text = "🔔 💎 【天賦覺醒 ・ 職業轉職任務】 💎 🔔\n"
-    text += f"✨ 檢測到你目前的職業為：【{current_job}】\n"
+    text = "🔔 💎 【本命天賦覺醒 ・ 職業進階提示】 💎 🔔\n"
+    text += f"✨ 勇者，你當前的本命職涯為：【{current_job}】\n"
     text += "─────────────────\n"
-    text += "🔮 命運分歧！請選擇你接下來要繼承的強大天賦：\n\n"
     
-    for next_job in next_list:
+    # 如果是初心者，炸出6大起始一轉選項
+    if current_job == "初心者":
+        text += "🔮 冒險的起點！請選擇你這輩子唯一的守護信仰：\n\n"
+        for next_job in next_list:
+            target_info = JOBS_DATA[next_job]
+            text += f"🚩 【{next_job}】(Lv.25 轉職門檻)\n"
+            text += f"   ┗ 🔮 專屬技能：{list(target_info['skills'].keys())[0]}\n"
+    else:
+        # 如果已經選了系別，只會精準吐出下一階的那「唯一一個」進階職業
+        next_job = next_list[0]
         target_info = JOBS_DATA[next_job]
-        text += f"🚩 【{next_job}】(Lv.{target_info['req_lvl']}+)\n"
-        text += "   📜 職業專屬技能圖鑑：\n"
+        text += f"🔮 境界突破！你即將迎來突破，覺醒為更高階的職位：\n\n"
+        text += f"🚩 👑 真・本命進階：【{next_job}】(Lv.{target_info['req_lvl']} 解鎖)\n"
+        text += "   📜 覺醒附加專屬能力與技能：\n"
         for s_name, s_info in target_info["skills"].items():
             text += f"   ┗ 🔮 {s_name}：{s_info['desc']}\n"
-        text += "\n"
-        
+            
     text += "─────────────────\n"
-    text += "✍️ 轉職法術口令：輸入【轉職 職業名稱】即可完成覺醒！\n（例如：轉職 戰士）"
+    text += "✍️ 突破法術口令：輸入【轉職 職業名稱】即可完成覺醒！\n（例如：轉職 戰士）"
     return text
