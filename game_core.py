@@ -14,7 +14,7 @@ from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
 from linebot.models import TextSendMessage, FlexSendMessage
 
 def process_game_logic(event, line_bot_api, configuration):
-    """【皇家分流主控台 完全體】"""
+    """【皇家分流主控台 終極防彈過審版】全面升級 Dict 發送模型，封印 KeyError: 'type'"""
     user_id = event.source.user_id
     user_msg = event.message.text.replace(" ", "").strip()
     
@@ -37,18 +37,30 @@ def process_game_logic(event, line_bot_api, configuration):
     elif user_msg == "我的背包" or user_msg == "背包":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的私人物品倉庫", contents=bag.get_bag_card(p)))
         return
+        
+    # ✨ 【Bug 終極修正點】將原本會閃退的 FlexSendMessage 拆解，改用符合 v3 規範的萬能 Dict 機制，並帶出橫移小標籤！
     elif user_msg == "我的裝備" or user_msg == "裝備":
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的神聖裝備欄", contents=forge_system.get_equipment_card(p)))
+        card_data = forge_system.get_equipment_card(p)
+        msg_payload = {
+            "replyToken": event.reply_token,
+            "messages": [{
+                "type": "flex", 
+                "altText": "我的神聖裝備欄", 
+                "contents": card_data["flex"], 
+                "quickReply": card_data["quick_reply"]
+            }]
+        }
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+        
     elif user_msg == "脫下裝備":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
         return
     elif user_msg == "世界地圖" or user_msg == "出城冒險":
-        # 彈出包含「主城」在內的全新 21 張地圖 Carousel 廊
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟世界傳送選單", contents=maps.get_maps_carousel(p)))
         return
     elif user_msg.startswith("前往") or user_msg.startswith("傳送"):
-        # 呼叫防彈 change_map 直接自動改寫並儲存
         res_text = maps.change_map(p, user_msg)
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res_text))
         return
