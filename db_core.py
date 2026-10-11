@@ -47,7 +47,7 @@ def save_player(p):
     conn.close()
 
 def make_battle_card(title, p, enemy):
-    """【皇家主城/野外地圖限制完全體】自動隱藏城市械鬥，解鎖獨立爬塔、世界 Boss 快捷圖標"""
+    """【皇家地圖分流完全體】依位置動態切換小圖標，戰鬥中常駐解鎖技能防禦熱鍵"""
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
@@ -70,7 +70,6 @@ def make_battle_card(title, p, enemy):
         }
                 
     contents = []
-    # 🏙️ 智慧標頭：自動辨識城市安全區還是危險野外
     if p["hp"] <= 0: 
         header_title = "☠️ 勇者不幸陣亡 ☠️"
     elif p.get("current_map") == "主城":
@@ -105,17 +104,17 @@ def make_battle_card(title, p, enemy):
     if p["hp"] <= 0:
         quick_items.append(QuickReplyItem(action=MessageAction(label="😇 祈求復活", text="復活")))
     elif enemy:
-        # ⚔️ 1. 野外激烈戰鬥中（保留尋怪、普通攻擊與所有「主動技能快捷鍵」圖標）
+        # ⚔️ 1. 野外激烈戰鬥中（精準 4 空格齊頭對齊修復！）
         quick_items.append(QuickReplyItem(action=MessageAction(label="⚔️ 普通攻擊", text="攻擊")))
+        # ✨ 【優化二：戰術實裝】常駐為所有職業塞入【🛡️ 技能防禦】實體小標籤快捷鍵！
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🛡️ 技能防禦", text="使用技能防禦")))
         for s_name, s_info in job_mod.get("skills", {}).items():
             if s_info.get("type") == "active" and s_name != "普通攻擊":
                 quick_items.append(QuickReplyItem(action=MessageAction(label=f"🔮 {s_name}", text=f"使用技能 {s_name}")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🏃 轉身逃跑", text="逃跑")))
         
     elif p.get("current_map") == "主城":
-        # 🏙️ 2. 【皇家安全主城】快捷小圖標全新解耦分家！
-        # ❌ 沒有怪物！絕對隱藏「尋怪」與「攻擊」，封印械鬥！
-        # 🟢 完美亮出：簽到、製作道具NPC工坊、爬塔、世界BOSS獨立直達按鈕！
+        # 🏙️ 2. 【皇家安全主城】快捷控制小圖標列
         quick_items.append(QuickReplyItem(action=MessageAction(label="📆 每日簽到", text="簽到")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="⚒️ 遠古工坊NPC", text="工坊")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🗼 試煉之塔", text="挑戰爬塔")))
