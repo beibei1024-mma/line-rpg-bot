@@ -1,5 +1,5 @@
 import random
-from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
+from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient, BroadcastRequest
 from linebot.models import TextSendMessage, FlexSendMessage
 
 import db_core
@@ -10,8 +10,11 @@ import jobs
 import jobs_system
 import notice_system
 
+# ✨ 【Bug 終極封印】精準在頂部補上 forge_system 的全域導入，徹底瓦解 NameError 閃退已讀不回！
+import forge_system
+
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【傳奇戰鬥大腦 v2.0】實裝 MP 扣除、技能專屬公式、戰場防禦、逃跑扣罰，縮排精準過審"""
+    """【純粹戰鬥計算機 v2.5】補齊全域導入組件，讓打怪爆裝與舊武器回存背包管線完美接通"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -38,7 +41,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
     # 讀取武器與手工裝備附加屬性
     current_weapon = p.get("weapon", "赤手空拳")
     w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
-    # 讀取工坊打造武器的隨機額外屬性加成 (優化三預留)
     forge_bonus = int(p.get("forge_weapon_bonus", 0))
     w_bonus += forge_bonus
 
@@ -67,17 +69,16 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 3. 🏃 優化二：逃跑扣罰與博弈機制
+    # 3. 🏃 逃跑扣罰與博弈機制
     elif user_msg == "逃跑":
         if p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 周圍沒有怪物，你不需要逃跑。"))
             return
         enemy = p["enemy"]
-        # 30% 機率逃跑失敗
         if random.random() < 0.30:
             m_atk = random.randint(1, enemy["atk"])
             p_def = vit_val // 2
-            backlash_dmg = max(1, (m_atk - p_def) * 2) # 遭到憤怒的雙倍反擊
+            backlash_dmg = max(1, (m_atk - p_def) * 2)
             p["hp"] = max(0, p["hp"] - backlash_dmg)
             log = f"🏃 ❌ 逃跑失敗！你露出了巨大的破綻，遭到【{enemy['name']}】憤怒的背後致命重擊，受到雙倍傷害 -{backlash_dmg} 點！"
             if p["hp"] <= 0:
@@ -89,7 +90,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 db_core.save_player(p)
                 card_data = db_core.make_battle_card(log, p, enemy)
         else:
-            # 成功逃跑扣除 10 金幣
             p["gold"] = max(0, p["gold"] - 10)
             p["enemy"] = None
             db_core.save_player(p)
@@ -99,6 +99,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "逃跑結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+
     # 4. ⚔️ 核心戰鬥揮刀、防禦與主動技能公式實體連動
     elif user_msg == "攻擊" or user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
         if p["hp"] <= 0 or p["enemy"] is None:
