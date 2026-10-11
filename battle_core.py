@@ -25,7 +25,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
     agi_val = int(base_agi * job_mod["agi_mod"])
     int_val = int(base_int * job_mod["int_mod"])
     vit_val = int(base_vit * job_mod["vit_mod"])
-    luk_val = int(base_luk * job_mod["luck_mod"])
+    # ✨ 【Bug 完美修復】將原本錯誤的 luck_mod 修正對齊為 jobs.py 內正牌的 luk_mod
+    luk_val = int(base_luk * job_mod["luk_mod"])
     men_val = int(base_men * job_mod["men_mod"])
     
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
@@ -110,26 +111,21 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card(title_log, p, random_monster)))
         return
 
-    # ✨ 企劃 A：處理【技能書】呼叫判定（彈出多按鈕快捷卡片）
+    # 處理【技能書】呼叫判定
     elif user_msg == "技能書":
         if p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 戰場外無法呼叫戰鬥技能書面板。"))
             return
-        
-        # 過濾該職業所有的主動技能
         active_skills = {k: v for k, v in job_mod["skills"].items() if v.get("type") == "active"}
-        
         if current_job == "初心者" or not active_skills:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 【初心者】階段尚未覺醒任何秘術招式，請直接普通攻擊！"))
             return
-            
         buttons = []
         for s_name, s_info in active_skills.items():
             buttons.append({
                 "type": "button", "style": "primary", "color": "#5856D6", "margin": "xs", "height": "sm",
                 "action": {"type": "message", "label": f"🔮 {s_name} (消耗:{s_info.get('mp_cost',0)}MP)", "text": f"使用技能 {s_name}"}
             })
-            
         flex_menu = {
             "type": "bubble",
             "styles": {"body": {"backgroundColor": "#1C1C1E"}},
@@ -145,9 +141,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         }
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟技能書", contents=flex_menu))
         return
-
     # D. 處理【攻擊】與【使用技能】核心戰鬥扣血邏輯
-    elif user_msg == "攻擊" or user_msg.startswith("使用技能"):
+    elif user_msg "攻擊" or user_msg.startswith("使用技能"):
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法發動攻擊（可能已陣亡或周圍沒有怪物）。"))
             return
@@ -178,7 +173,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         total_p_dmg = 0
         if is_skill:
             if skill_name in ["蓄力重擊", "火球術", "二連矢", "治癒術", "神聖盾擊", "毒刃襲擊", "元素暴風", "阿修羅霸凰拳", "極凍終焉", "弒神終結", "聖光懲戒", "暴風萬箭破"]:
-                # 各職業獨特傷害模型
                 if skill_name == "蓄力重擊":
                     total_p_dmg = int(random.randint(5+(str_val//2)+w_bonus, 12+str_val+w_bonus) * 1.6)
                 elif skill_name == "火球術":
@@ -193,7 +187,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                     total_p_dmg = int(int_val * 0.5)
                     log += f"💖 聖光降臨！大幅恢復了 {p['hp'] - old} 點生命值！\n"
                 else:
-                    total_p_dmg = int((str_val + agi_val + int_val) * 1.5) # 懶人保底公式
+                    total_p_dmg = int((str_val + agi_val + int_val) * 1.5)
                 log += f"💥 【{skill_name}】重擊命中，造成 {total_p_dmg} 點致命神聖傷害！\n"
         else:
             is_double = random.random() < double_atk_chance
@@ -202,32 +196,28 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                 if random.random() < crit_chance:
                     d = int(d * crit_dmg_mod)
                     log += f"💥 致命爆擊！第 {i+1} 擊物理爆擊轟出 {d} 點傷害！\n"
-            else:
-                log += f"⚔️ 第 {i+1} 擊普通命中，造成 {d} 點傷害！\n"
-            total_p_dmg += d
+                else: 
+                    log += f"⚔️ 第 {i+1} 擊普通命中，造成 {d} 點傷害！\n"
+                total_p_dmg += d
 
         enemy["hp"] -= total_p_dmg
         
         # ── 2. 戰鬥結果判定 ──
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
-            # 💰 【黃金解包修復】精準抓取 tuple 索引區間，乘上地圖金幣加成
-            base_gold = random.randint(enemy["gold_range"][0], enemy["gold_range"][1])
-            final_gold = int(base_gold * gold_mod)
-            
+            final_gold = int(random.randint(enemy["gold_range"][0], enemy["gold_range"][1]) * gold_mod)
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
             p["enemy"] = None
-            p["mp"] = min(calculated_max_mp, p.get("mp", calculated_max_mp) + 25) # 自然冥想
+            p["mp"] = min(calculated_max_mp, p.get("mp", calculated_max_mp) + 25)
             
-            log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力值自然回冥想恢復 +25 點。\n"
+            log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力值自然冥想恢復 +25 點。\n"
             
             if random.random() < 0.50 and enemy.get("drop_item"):
                 import bag as bg_mod
                 bg_mod.add_to_inventory(p, enemy["drop_item"], is_material=True)
                 log += f"💎 【幸運掉寶】！搜刮到了素材：【{enemy['drop_item']}】x1！\n"
                 
-            # 升級判定機制
             while p["exp"] >= p["level"] * 50:
                 p["exp"] -= p["level"] * 50
                 p["level"] += 1
@@ -236,24 +226,19 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                 p["attribute_points"] = p.get("attribute_points", 0) + 5
                 log += f"\n🎊 歷練突破！恭喜晉升至 Lv.{p['level']}！獲得潛能點數 +5 點！"
                 
-            p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15) # 回滿血
+            p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
             db_core.save_player(p)
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥結束", contents=db_core.make_battle_card(log, p, None)))
-            
         else:
             # ── 3. 怪物反擊與環境效果連動 ──
             env_str = enemy.get("env", "")
             
-            # 🔮 企劃 B：環境對傷害進行加成判定
-            if "暴雨滂沱" in env_str: 
-                vit_val = int(vit_val * 0.8) # 防禦下降
-            if "魔能潮汐" in env_str and skill_name == "火球術": 
-                log += "🌀 【環境魔能湧動】！火球術威力額外暴衝！\n"
+            if "暴雨滂沱" in env_str: vit_val = int(vit_val * 0.8)
+            if "魔能潮汐" in env_str and skill_name == "火球術": log += "🌀 【環境魔能湧動】！火球術威力額外暴衝！\n"
             if "精神污染" in enemy.get("skill", ""):
                 p["mp"] = max(0, p["mp"] - 20)
                 log += f"\n👁️ 🚨 邪神被動【精神污染】！魔力值被吸走 20 點！"
-                
-            # 怪物反擊傷害計算
+
             final_m_atk = random.randint(1, enemy["atk"])
             if "流沙肆虐" in env_str and random.random() < 0.20:
                 log += f"\n💨 怪物利用【流沙掩護】輕巧閃過了你的部分攻勢！"
@@ -263,7 +248,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             p["hp"] -= dmg_received
             log += f"\n🩹 【{enemy['name']}】發動反擊！你受到 {dmg_received} 點物理傷害！"
             
-            # 檢查勇者是否陣亡
             if p["hp"] <= 0:
                 p["hp"] = 0
                 p["enemy"] = None
@@ -275,6 +259,5 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                 card = db_core.make_battle_card(log, p, enemy)
                 
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥回合", contents=card))
-            
     else:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請點擊下方選單開始冒險！"))
