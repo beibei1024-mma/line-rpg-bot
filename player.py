@@ -4,12 +4,12 @@ import jobs
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
 def get_status_card(p):
-    """👤 【狀態面板 UI 優化版】徹底拔除後方臃腫括號說明，重現極簡極致質感"""
+    """👤 【狀態面板 2.0 矩陣完全體】依指定格式橫向並排，呈現精品級 RPG 面板"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
     
-    # 衍生計算
+    # 🌟 1. 核心基礎六圍計算
     str_val = int(p.get("strength", 10 + (level * 3)) * job_mod["str_mod"])
     agi_val = int(p.get("agility", 10 + (level * 2)) * job_mod["agi_mod"])
     int_val = int(p.get("intelligence", 10 + (level * 2)) * job_mod["int_mod"])
@@ -18,10 +18,22 @@ def get_status_card(p):
     men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
     free_pts = p.get("attribute_points", 0)
     
+    # 🌟 2. 攻防進階與狀態上限衍生計算
+    w_bonus = weapons.SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in weapons.SHOP_WEAPONS else 0
+    p_atk_min = 5 + (str_val // 2) + w_bonus
+    p_atk_max = 12 + str_val + w_bonus
+    m_atk_min = 3 + (int_val // 2)
+    m_atk_max = 10 + int_val
+    
+    p_def = vit_val // 2
+    m_def = men_val // 2
+    
+    double_chance = min(60, 2 + (agi_val // 6))
+    crit_chance = min(80, 10 + (luk_val // 5))
+    
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
     
-    # 魔力空值過濾器
     current_mp = p.get("mp")
     if current_mp is None or current_mp == "None":
         current_mp = calculated_max_mp
@@ -35,28 +47,56 @@ def get_status_card(p):
         "body": {
             "type": "box", "layout": "vertical", "spacing": "md",
             "contents": [
-                {"type": "text", "text": f"👤 勇者天賦狀態卡 (Lv.{level})", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+                {"type": "text", "text": f"👤 勇者狀態面板 (Lv.{level})", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
                 {"type": "separator", "color": "#333333"},
-                # 基礎狀態區
+                
+                # 📜 基礎大狀態
                 {"type": "box", "layout": "vertical", "spacing": "xs", "contents": [
                     {"type": "text", "text": f"🎭 目前職業：🔥【{current_job}】", "size": "sm", "color": "#007AFF", "weight": "bold"},
-                    {"type": "text", "text": f"📍 目前位置：📍【{p.get('current_map', '主城')}】", "size": "sm", "color": "#E0E0E0"},
-                    {"type": "text", "text": f"💖 生命狀態：{p['hp']} / {calculated_max_hp}", "size": "sm", "color": "#4CD964"},
-                    {"type": "text", "text": f"🔷 魔力狀態：{current_mp} / {calculated_max_mp}", "size": "sm", "color": "#34AADC"},
-                    {"type": "text", "text": f"💰 擁有金幣：🪙 {p['gold']}", "size": "sm", "color": "#FFD700"},
-                    {"type": "text", "text": f"🌟 經驗進度：{p['exp']} / {level * 50}", "size": "sm", "color": "#AF52DE"},
-                    {"type": "text", "text": f"✨ 剩餘潛能：{free_pts} 點", "size": "sm", "color": status_color, "weight": "bold"}
+                    {"type": "text", "text": f"💰 擁有金幣：🪙 {p['gold']}  |  🌟 經驗：{p['exp']}/{level * 50}", "size": "sm", "color": "#E0E0E0"},
+                    {"type": "text", "text": f"✨ 剩餘潛能點數：{free_pts} 點", "size": "sm", "color": status_color, "weight": "bold"}
                 ]},
                 {"type": "separator", "color": "#333333"},
-                # ✨ 【UI 升級優化】乾淨、清爽的純能力六圍展現，徹底與難看的括號道別！
-                {"type": "text", "text": "⚔️ 核心戰術屬性六圍", "weight": "bold", "size": "sm", "color": "#FFFFFF"},
-                {"type": "box", "layout": "vertical", "spacing": "xs", "contents": [
-                    {"type": "text", "text": f"💪 力量 (STR): {str_val}", "size": "sm", "color": "#E0E0E0"},
-                    {"type": "text", "text": f"⚡ 敏捷 (AGI): {agi_val}", "size": "sm", "color": "#E0E0E0"},
-                    {"type": "text", "text": f"🔮 智力 (INT): {int_val}", "size": "sm", "color": "#E0E0E0"},
-                    {"type": "text", "text": f"🛡️ 體力 (VIT): {vit_val}", "size": "sm", "color": "#E0E0E0"},
-                    {"type": "text", "text": f"🍀 幸運 (LUK): {luk_val}", "size": "sm", "color": "#E0E0E0"},
-                    {"type": "text", "text": f"🌟 精神 (MEN): {men_val}", "size": "sm", "color": "#E0E0E0"}
+                
+                # ⚔️ 欄位一：核心屬性欄 (三格並排 × 2層 = 完美六圍)
+                {"type": "text", "text": "🧬 【 核心天賦主屬性 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
+                {"type": "box", "layout": "horizontal", "contents": [
+                    {"type": "text", "text": f"💪 力量: {str_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
+                    {"type": "text", "text": f"⚡ 敏捷: {agi_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
+                    {"type": "text", "text": f"🔮 智力: {int_val}", "size": "xs", "color": "#FFFFFF", "flex": 1}
+                ]},
+                {"type": "box", "layout": "horizontal", "contents": [
+                    {"type": "text", "text": f"🛡️ 體力: {vit_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
+                    {"type": "text", "text": f"🍀 幸運: {luk_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
+                    {"type": "text", "text": f"🌟 精神: {men_val}", "size": "xs", "color": "#FFFFFF", "flex": 1}
+                ]},
+                {"type": "separator", "color": "#222222", "margin": "sm"},
+                
+                # ⚔️ 欄位二：攻防進階欄 (兩格並排 × 2層 = 四大數據)
+                {"type": "text", "text": "⚔️ 【 戰術攻防進階值 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
+                {"type": "box", "layout": "horizontal", "contents": [
+                    {"type": "text", "text": f"💥 物傷: {p_atk_min}~{p_atk_max}", "size": "xs", "color": "#FF9500", "flex": 1},
+                    {"type": "text", "text": f"🔮 魔傷: {m_atk_min}~{m_atk_max}", "size": "xs", "color": "#5AC8FA", "flex": 1}
+                ]},
+                {"type": "box", "layout": "horizontal", "contents": [
+                    {"type": "text", "text": f"🧱 物防: {p_def}", "size": "xs", "color": "#FF3B30", "flex": 1},
+                    {"type": "text", "text": f"🌀 法防: {m_def}", "size": "xs", "color": "#AF52DE", "flex": 1}
+                ]},
+                {"type": "separator", "color": "#222222", "margin": "sm"},
+                
+                # ⚔️ 欄位三：戰術機率欄 (兩格並排 = 雙暴率)
+                {"type": "text", "text": "🎲 【 戰場觸發修正率 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
+                {"type": "box", "layout": "horizontal", "contents": [
+                    {"type": "text", "text": f"💨 連擊率: {double_chance}%", "size": "xs", "color": "#E0E0E0", "flex": 1},
+                    {"type": "text", "text": f"✨ 爆擊率: {crit_chance}%", "size": "xs", "color": "#FFCC00", "weight": "bold", "flex": 1}
+                ]},
+                {"type": "separator", "color": "#222222", "margin": "sm"},
+                
+                # ⚔️ 欄位四：狀態上限欄 (生命、魔力極致對齊)
+                {"type": "text", "text": "📊 【 當前狀態精準值 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
+                {"type": "box", "layout": "horizontal", "contents": [
+                    {"type": "text", "text": f"💖 血量: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#4CD96 green", "flex": 1},
+                    {"type": "text", "text": f"🔷 魔力: {current_mp} / {calculated_max_mp}", "size": "xs", "color": "#007AFF", "flex": 1}
                 ]}
             ]
         }
