@@ -63,12 +63,51 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔒 【天賦界限卡關中】\n勇者！你目前已達到了 Lv.{p['level']} 的天賦瓶頸，必須完成天賦覺醒才能繼續獲取經驗與冒險！\n\n{job_notice}"))
             return
 
-    # B. 配點處理
+    # B. 處理【加點 / 配點】指令判定 (完美相容有無空白格式)
     if user_msg.startswith("加點") or user_msg.startswith("配點"):
-        raw_msg = user_msg.replace("配點", "加點").strip().split()
-        # 原邏輯支援空白分隔，此處保留格式防呆
-        # 由於 game_core 已移除空白，故由 game_core 原生發送或相容
-        pass # (基於篇幅，配點邏輯維持您原有的處理方式即可)
+        # 🧪 【無痛字串全自動拆解】直接從乾淨的原始訊息中提取屬性與數字
+        clean_msg = event.message.text.strip().replace("配點", "加點")
+        raw_parts = clean_msg.split()
+        
+        # 如果玩家輸入有帶空白 (例如: 加點 力量 200)
+        if len(raw_parts) == 3:
+            attr_name = raw_parts[1].strip()
+            pts_str = raw_parts[2].strip()
+        else:
+            # 如果空白被 game_core 剃除了 (例如: 加點力量200)
+            # 嘗試用關鍵字切開
+            try:
+                target_str = clean_msg.replace("加點", "") # 剩餘 "力量200"
+                attr_name = target_str[:2] # 抓前兩個字 "力量"
+                pts_str = target_str[2:]   # 抓後面的數字 "200"
+            except Exception:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 格式錯誤！正確口令：【加點 屬性名稱 點數】\n（例如：加點 力量 5）"))
+                return
+                
+        try: 
+            pts_to_add = int(pts_str)
+        except ValueError:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 點數必須是阿拉伯數字！"))
+            return
+            
+        free_pts = p.get("attribute_points", 0)
+        if pts_to_add <= 0 or free_pts < pts_to_add:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 點數分配不合法或潛能點不足！你目前剩餘 {free_pts} 點。"))
+            return
+            
+        attr_mapping = {"力量": "strength", "敏捷": "agility", "智力": "intelligence", "體力": "vitality", "幸運": "luck", "精神": "sprit"}
+        if attr_name not in attr_mapping:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 可加點項目：力量、敏捷、智力、體力、幸運、精神。"))
+            return
+            
+        db_field = attr_mapping[attr_name]
+        p[db_field] = p.get(db_field, 10) + pts_to_add
+        p["attribute_points"] = free_pts - pts_to_add
+        db_core.save_player(p)
+        
+        reply_log = f"💪 🧪 【配點成功】 🧪 💪\n你成功將 {pts_to_add} 點潛能自由點數，分配給了──✨【{attr_name}】屬性！\n\n🔹 剩餘未分配點數：{p['attribute_points']} 點。"
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="配點成功", contents=db_core.make_battle_card(reply_log, p, None)))
+        return
 
     # C. 尋找怪物處理
     elif user_msg in ["尋找怪物", "尋怪"]:
