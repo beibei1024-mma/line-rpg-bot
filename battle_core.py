@@ -1,6 +1,6 @@
 import random
-# 🚀 v3 SDK 必備的實體貨櫃解析元件導入
-from linebot.v3.messaging import ReplyMessageRequest, FlexMessage, FlexContainer, MessagingApi, ApiClient
+# 🚀 導入最安全的純 Dict 發送代理元件
+from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
 from linebot.models import TextSendMessage, FlexSendMessage
 
 import db_core
@@ -10,7 +10,7 @@ import bag
 import jobs
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【v3 貨櫃完全相容版】全面導正 FlexContainer 封裝，徹底封印發送閃退 Bug"""
+    """【萬能 Dict 封裝相容版】全面棄用硬編碼物件，使用純 JSON 結構徹底瓦解參數驗證天坑"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -60,15 +60,20 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             return
         p["job"] = target_job
         db_core.save_player(p)
-        log_text = f"✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 你正式進階為更高的職業形態——🔥【{target_job}】！\n點擊底部【狀態】小圖卡查看全新戰力！"
+        log_text = f"✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 你正式進階為更高的職業形態——🔥【{target_job}】！"
         
         card_data = db_core.make_battle_card(log_text, p, None)
-        # ✨ 【真・v3 規範更新】將格式封裝成正牌的 FlexContainer，並綁定智慧型滑動小按鈕
+        # ✨ 【真・萬能非同步封裝】直接包裝成一體化 Dict 傳送，完美相容新舊所有版本的 contents 欄位
+        msg_payload = {
+            "replyToken": event.reply_token,
+            "messages": [{
+                "type": "flex", "altText": "轉職成功",
+                "contents": card_data["flex"],
+                "quickReply": card_data["quick_reply"]
+            }]
+        }
         with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[FlexMessage(alt_text="轉職成功", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
-            ))
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
     # 轉職卡關防呆
@@ -112,11 +117,16 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         reply_log = f"💪 【配點成功】！你將 {pts_to_add} 點潛能點數分配給了──✨【{attr_name}】屬性！"
         
         card_data = db_core.make_battle_card(reply_log, p, None)
+        msg_payload = {
+            "replyToken": event.reply_token,
+            "messages": [{
+                "type": "flex", "altText": "配點成功",
+                "contents": card_data["flex"],
+                "quickReply": card_data["quick_reply"]
+            }]
+        }
         with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[FlexMessage(alt_text="配點成功", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
-            ))
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
     # C. 尋找怪物處理
@@ -134,11 +144,16 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         title_log = f"⚠️ 遭遇強敵！在📍【{current_location}】撞見了對手！\n\n📢 環境狀態：{random_monster['env']}\n🔰 怪物被動：{random_monster['skill']}"
         
         card_data = db_core.make_battle_card(title_log, p, random_monster)
+        msg_payload = {
+            "replyToken": event.reply_token,
+            "messages": [{
+                "type": "flex", "altText": "遭遇怪物",
+                "contents": card_data["flex"],
+                "quickReply": card_data["quick_reply"]
+            }]
+        }
         with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[FlexMessage(alt_text="遭遇怪物", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
-            ))
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
     # 處理【技能書】呼叫與 D. 核心戰鬥扣血邏輯
     elif user_msg == "技能書":
@@ -238,7 +253,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         # ── 2. 戰鬥結果判定 ──
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
-            final_gold = int(random.randint(enemy["gold_range"][0], enemy["gold_range"][1]) * gold_mod)
+            final_gold = int(random.randint(enemy["gold_range"], enemy["gold_range"]) * gold_mod)
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
             p["enemy"] = None
@@ -262,11 +277,16 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             db_core.save_player(p)
             
             card_data = db_core.make_battle_card(log, p, None)
+            msg_payload = {
+                "replyToken": event.reply_token,
+                "messages": [{
+                    "type": "flex", "altText": "戰鬥結束",
+                    "contents": card_data["flex"],
+                    "quickReply": card_data["quick_reply"]
+                }]
+            }
             with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[FlexMessage(alt_text="戰鬥結束", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
-                ))
+                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         else:
             # ── 3. 怪物反擊與環境效果連動 ──
             env_str = enemy.get("env", "")
@@ -295,10 +315,15 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 db_core.MEMORY_PLAYERS[event.source.user_id] = p
                 card_data = db_core.make_battle_card(log, p, enemy)
                 
+            msg_payload = {
+                "replyToken": event.reply_token,
+                "messages": [{
+                    "type": "flex", "altText": "戰鬥回合",
+                    "contents": card_data["flex"],
+                    "quickReply": card_data["quick_reply"]
+                }]
+            }
             with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[FlexMessage(alt_text="戰鬥回合", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
-                ))
+                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
     else:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請點擊下方 QuickReply 智慧小按鈕開始冒險！"))
