@@ -3,7 +3,6 @@ import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# 🚀 本地快取記憶體暫存區：普通互毆扣血只在本地計算，打死怪才同步回雲端，大幅提升回傳速度
 MEMORY_PLAYERS = {}
 
 def get_db_connection():
@@ -20,8 +19,9 @@ def load_player(user_id):
     player = cur.fetchone()
     
     if not player:
+        # ✨ 在初始註冊時，同步加入 mp=50 的設定
         cur.execute(
-            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0)",
+            "INSERT INTO players (user_id, hp, max_hp, mp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points) VALUES (%s, 100, 100, 50, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0)",
             (user_id,)
         )
         conn.commit()
@@ -43,9 +43,10 @@ def save_player(p):
     cur = conn.cursor()
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
     
+    # ✨ 在 SQL UPDATE 語句中，精準同步寫入 mp=%s 欄位
     cur.execute(
-        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s WHERE user_id=%s",
-        (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
+        "UPDATE players SET hp=%s, max_hp=%s, mp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s WHERE user_id=%s",
+        (p['hp'], p['max_hp'], p.get('mp', 50), p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
          p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p['user_id'])
     )
     conn.commit()
@@ -53,7 +54,6 @@ def save_player(p):
     conn.close()
 
 def make_battle_card(title, p, enemy):
-    """【真・防彈優化】將所有 LINE 不支援的敏感排版標籤全部剔除，確保 100% 順暢發送不已讀"""
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
@@ -63,17 +63,23 @@ def make_battle_card(title, p, enemy):
     vit_val = int(base_vit * job_mod["vit_mod"])
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     
+    # 🔷 計算最大魔力與當前 MP 百分比
+    base_men = p.get("sprit", 10 + (level * 2))
+    men_val = int(base_men * job_mod["men_mod"])
+    calculated_max_mp = 50 + (men_val * 4) + (level * 5)
+    current_mp = p.get("mp", calculated_max_mp)
+    
     p_pct = max(0, min(100, int((p["hp"] / calculated_max_hp) * 100)))
+    mp_pct = max(0, min(100, int((current_mp / calculated_max_mp) * 100)))
     
     def get_bar(pct, color): 
         return {
-            "type": "box", "layout": "vertical", "backgroundColor": "#2A2A2A", "height": "10px", "cornerRadius": "5px", "margin": "md", 
+            "type": "box", "layout": "vertical", "backgroundColor": "#2A2A2A", "height": "10px", "cornerRadius": "5px", "margin": "xs", 
             "contents": [{"type": "box", "layout": "vertical", "backgroundColor": color, "width": f"{pct}%", "height": "10px", "cornerRadius": "5px"}]
         }
                 
     contents = []
     
-    # ⚔️ 1. 頂部動態戰報日誌區 
     if "擊敗對手" in title:
         header_title = "🏆 戰鬥大獲全勝 🏆"
     elif "突破成功" in title:
@@ -85,13 +91,8 @@ def make_battle_card(title, p, enemy):
         
     contents.append({"type": "text", "text": header_title, "weight": "bold", "size": "md", "align": "center"})
     contents.append({"type": "separator", "margin": "md"})
+    contents.append({"type": "text", "text": str(title), "size": "sm", "wrap": True, "margin": "md"})
     
-    # 📝 2. 戰報詳細日誌內容區（100% 標準乾淨格式，絕無 lineSpacing 屬性）
-    contents.append({
-        "type": "text", "text": str(title), "size": "sm", "wrap": True, "margin": "md"
-    })
-    
-    # 👾 3. 敵方怪物血條區
     if enemy: 
         e_pct = max(0, min(100, int((enemy["hp"] / enemy["max_hp"]) * 100)))
         contents.extend([
@@ -101,12 +102,15 @@ def make_battle_card(title, p, enemy):
             get_bar(e_pct, "#FF3B30")
         ])
         
-    # 👤 4. 勇者血條固定區
     contents.extend([
         {"type": "separator", "margin": "md"}, 
-        {"type": "text", "text": f"👤 勇者進度 ({current_job} Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
+        {"type": "text", "text": f"👤 勇者狀態 ({current_job} Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
+        # 顯示血量條
         {"type": "text", "text": f"血量狀態: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
-        get_bar(p_pct, "#4CD964")
+        get_bar(p_pct, "#4CD964"),
+        # ✨ UI 優化：在戰鬥卡片中同步渲染「魔力條（藍色）」
+        {"type": "text", "text": f"魔力狀態: {current_mp} / {calculated_max_mp}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
+        get_bar(mp_pct, "#34AADC")
     ])
     
     return {"type": "bubble", "body": {"type": "box", "layout": "vertical", "contents": contents}}
