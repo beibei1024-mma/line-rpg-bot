@@ -29,9 +29,9 @@ def process_game_logic(event, line_bot_api):
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的私人物品倉庫", contents=bag.get_bag_card(p)))
         return
         
-    # 3. 處理【世界地圖】傳送陣清單查詢判定 (維持原樣)
+    # 3. 處理【世界地圖】查詢判定 ➡️ 🔥 這裡要從原本的 TextSendMessage 改成 Carousel 格式！
     elif user_msg == "世界地圖":
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps.get_maps_list_text(p)))
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟世界傳送選單", contents=maps.get_maps_carousel(p)))
         return
         
     # 4. 處理【前往 / 傳送】指令判定 (維持原樣)
