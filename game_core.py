@@ -91,26 +91,36 @@ def process_game_logic(event, line_bot_api, configuration):
             MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 12. 處理【冒險挑戰】爬塔與世界 Boss 獨立頁面分流
+    # 12. 處理【冒險挑戰】爬塔與世界 Boss 獨立頁面分流 ➡️ 🔥 升級為 QuickReply 智慧格式！
     elif user_msg == "冒險挑戰" or user_msg == "挑戰":
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="皇家試煉選單", contents=challenge_system.get_challenge_menu(p)))
+        card_data = challenge_system.get_challenge_menu(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "挑戰場", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
         
     elif user_msg == "挑戰爬塔":
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=challenge_system.execute_tower_climb(p)))
+        res = challenge_system.execute_tower_climb(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "試煉戰況", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
         
     elif user_msg == "挑戰世界Boss" or user_msg == "世界Boss":
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=challenge_system.execute_world_boss_raid(p)))
+        res = challenge_system.execute_world_boss_raid(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 13. 處理【鍛造 / 工坊】手工史詩神裝合成獨立頁面分流
+    # 13. 處理【鍛造 / 工坊】手工史詩神裝合成獨立頁面分流 ➡️ 🔥 升級為 QuickReply 智慧格式！
     elif user_msg == "鍛造工坊" or user_msg == "鍛造" or user_msg == "工坊":
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遠古鍛造工坊", contents=forge_system.get_forge_menu(p)))
+        card_data = forge_system.get_forge_menu(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
         
     elif user_msg.startswith("鍛造"):
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_forge_weapon(p, user_msg)))
+        res = forge_system.execute_forge_weapon(p, user_msg)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "工坊熔煉結果", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
     # 🛑 14. 【終極保底出口】：其餘普通攻擊、尋怪、施放法術指令，全自動安全移交戰鬥大腦處理
