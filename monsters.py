@@ -95,6 +95,11 @@ MONSTERS_BASE = {
     "wyvern": {"name": "雙足劇毒飛龍", "level": 46, "min_hp": 5200, "max_hp": 7200, "atk": 210, "gold_range": (2200, 8500), "exp": 48000, "drop_item": "毒腺衣羽"},
     "dragon_egg_thief": {"name": "偷蛋竊賊龍", "level": 47, "min_hp": 4800, "max_hp": 6500, "atk": 230, "gold_range": (3000, 10000), "exp": 52000, "drop_item": "被偷的巨龍蛋"},
     "drake": {"name": "遠古地行暴龍", "level": 48, "min_hp": 7000, "max_hp": 9500, "atk": 180, "gold_range": (2500, 9500), "exp": 58000, "drop_item": "暴龍巨骨"},
+    # ── 11. 巨龍巢穴與湮滅神殿核心精英 (與上一段 MONSTERS_BASE 字典內部對齊) ──
+    "dragon_guard": {"name": "赤焰守護飛龍", "level": 45, "min_hp": 5500, "max_hp": 7500, "atk": 190, "gold_range": (2000, 8000), "exp": 45000, "drop_item": "飛龍雙翼"},
+    "wyvern": {"name": "雙足劇毒飛龍", "level": 46, "min_hp": 5200, "max_hp": 7200, "atk": 210, "gold_range": (2200, 8500), "exp": 48000, "drop_item": "毒腺衣羽"},
+    "dragon_egg_thief": {"name": "偷蛋竊賊龍", "level": 47, "min_hp": 4800, "max_hp": 6500, "atk": 230, "gold_range": (3000, 10000), "exp": 52000, "drop_item": "被偷的巨龍蛋"},
+    "drake": {"name": "遠古地行暴龍", "level": 48, "min_hp": 7000, "max_hp": 9500, "atk": 180, "gold_range": (2500, 9500), "exp": 58000, "drop_item": "暴龍巨骨"},
     "dragon_mage": {"name": "龍人龍語大法師", "level": 49, "min_hp": 6500, "max_hp": 8800, "atk": 260, "gold_range": (2800, 11000), "exp": 65000, "drop_item": "龍語符文石"},
     "dragon": {"name": "世界Boss・地獄紅蓮巨龍", "level": 50, "min_hp": 15000, "max_hp": 22000, "atk": 320, "gold_range": (8000, 30000), "exp": 100000, "drop_item": "巨龍逆鱗"},
     "void_specter": {"name": "虛空湮滅幽魂", "level": 90, "min_hp": 25000, "max_hp": 35000, "atk": 480, "gold_range": (20000, 60000), "exp": 250000, "drop_item": "純淨虛空結晶"},
@@ -104,3 +109,49 @@ MONSTERS_BASE = {
     "shoggoth": {"name": "古老修格斯原液", "level": 96, "min_hp": 45000, "max_hp": 60000, "atk": 450, "gold_range": (28000, 80000), "exp": 400000, "drop_item": "不定型細胞核"},
     "mind_flayer": {"name": "奪心魔大長老", "level": 98, "min_hp": 32000, "max_hp": 45000, "atk": 720, "gold_range": (30000, 90000), "exp": 450000, "drop_item": "心靈控制頭冠"}
 }
+
+# 🚀 為了防呆補齊其餘衍生高階怪物的預設資料模型（保底公式防爆）
+def __getattr__(name):
+    if name in MONSTERS_BASE: 
+        return MONSTERS_BASE[name]
+    return {"name": f"神秘領域魔獸({name})", "level": 50, "min_hp": 5000, "max_hp": 7000, "atk": 150, "gold_range": (1000, 5000), "exp": 10000, "drop_item": "稀有魔核"}
+
+# 🌌 企劃 B：地圖動態氣候事件資料庫
+WEATHER_EVENTS = {
+    "新手村": ["🟢 風和日麗 (普通)", "🌧️ 暴雨滂沱 (勇者防禦力稍微下降)"],
+    "微光森林": ["🌲 妖精迷霧 (命中率微幅震盪)", "🦇 百鬼夜行 (黑夜怪物暴擊倍率翻倍)"],
+    "寒冰極地": ["❄️ 萬里無雲 (普通)", "🏔️ 暴風雪降臨 (每回合刺骨寒毒流血)"],
+    "炙熱熔岩": ["🔥 熔岩平靜 (普通)", "🌋 岩漿暴走 (怪物基礎攻擊力暴增 1.5 倍)"],
+    "骷髏荒漠": ["🌵 流沙肆虐 (怪物閃避率提升)", "🌪️ 劇毒沙塵暴 (反擊異常慘烈)"],
+    "湮滅神殿": ["👁️ 虛空扭曲 (不可名狀威壓)", "🔮 魔能潮汐 (魔法增幅異常狂暴)"]
+}
+
+def generate_random_monster(map_name):
+    available_monsters = MAP_MONSTER_SPAWN.get(map_name, ["slime"])
+    chosen_base_type = random.choice(available_monsters)
+    
+    # 保底防呆解包
+    if chosen_base_type in MONSTERS_BASE:
+        base = MONSTERS_BASE[chosen_base_type]
+    else:
+        base = {"name": f"📍{map_name}守護獸", "level": 30, "min_hp": 2000, "max_hp": 3500, "atk": 90, "gold_range": (1000, 4000), "exp": 8000, "drop_item": "古老結晶"}
+        
+    affix = random.choice(MONSTER_AFFIXES)
+    chosen_weather = random.choice(WEATHER_EVENTS.get(map_name, ["🟢 氣候穩定 (戰力無增減)"]))
+    
+    weather_atk_mod = 1.5 if "岩漿暴走" in chosen_weather else 1.0
+    final_hp = int(random.randint(base["min_hp"], base["max_hp"]) * affix["hp_mod"])
+    final_atk = int(base["atk"] * affix["atk_mod"] * weather_atk_mod)
+    
+    return {
+        "name": f"{affix['prefix']}{base['name']} (Lv.{base['level']})",
+        "hp": final_hp, 
+        "max_hp": final_hp, 
+        "atk": final_atk,
+        "gold_range": (int(base["gold_range"][0] * affix["gold_mod"]), int(base["gold_range"][1] * affix["gold_mod"])),
+        "exp": int(base["exp"] * affix["hp_mod"]),
+        "skill": affix["default_skill"] if chosen_base_type not in ["dragon", "cthulhu_avatar"] else "🔥 世界Boss神格：免疫一切控制，有機率秒殺勇者！",
+        "drop_item": base["drop_item"], 
+        "spawn_map": map_name, 
+        "env": chosen_weather
+    }
