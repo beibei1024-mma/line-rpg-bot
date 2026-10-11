@@ -120,7 +120,12 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
             gold_data = enemy["gold_range"]
-            final_gold = int(random.randint(int(gold_data), int(gold_data)) * gold_mod)
+            
+            # ✨ 【Bug 終極封印】精準抓取元組/列表的第 0 位與第 1 位進行數字提煉，徹底消滅 tuple 轉換閃退！
+            min_gold = int(gold_data[0])
+            max_gold = int(gold_data[1])
+            final_gold = int(random.randint(min_gold, max_gold) * gold_mod)
+            
             p["gold"] += final_gold; p["exp"] += enemy["exp"]
             
             p["mp"] = min(calculated_max_mp, (p.get("mp") if p.get("mp") is not None else calculated_max_mp) + 25)
@@ -136,7 +141,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                     p["weapon"] = drop_w
                     log += f"💎 🔥 【神裝降臨】！你驚喜搜刮到了專屬神兵：⚔️【{drop_w}】！已全自動換裝！\n"
 
-            # 📢 連動呼叫：安全移交 notice_system 獨立公告大腦發送全服世界公告
+            # 📢 全服世界公告
             raw_monster_name = enemy["name"]
             if "地獄紅蓮巨龍" in raw_monster_name or "邪神克蘇魯" in raw_monster_name:
                 notice_system.push_world_boss_broadcast(raw_monster_name, configuration)
@@ -147,19 +152,29 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
                 log += f"💎 【幸運掉寶】！素材：【{enemy['drop_item']}】x1！\n"
                 
-            # 🔒 連動呼叫：安全移交 jobs_system 獨立大腦進行卡等判定
+            # 🔒 安全移交 jobs_system 獨立大腦進行卡等判定
             is_job_locked = jobs_system.check_level_lock(p, job_mod)
                 
             p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
             db_core.save_player(p)
             
             card_data = db_core.make_battle_card(log, p, None)
-            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "戰鬥結束", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+            msg_payload = {
+                "replyToken": event.reply_token, 
+                "messages": [{
+                    "type": "flex", 
+                    "altText": "戰鬥結束", 
+                    "contents": card_data["flex"], 
+                    "quickReply": card_data["quick_reply"]
+                }]
+            }
             
             if is_job_locked:
                 msg_payload["messages"].append({"type": "text", "text": f"🔒 【天賦界限卡關中】\n勇者！你目前已達到了 Lv.{p['level']} 的天賦瓶頸，必須完成天賦轉職才能繼續獲取經驗！\n\n{jobs.get_job_options_text(p)}"})
                 
-            with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+            with ApiClient(configuration) as api_client:
+                messaging_api = MessagingApi(api_client)
+                messaging_api.reply_message(ReplyMessageRequest.from_dict(msg_payload))
         else:
             # ── 6. 怪物殘存與環境反擊 ──
             env_str = enemy.get("env", "")
@@ -179,8 +194,12 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 db_core.MEMORY_PLAYERS[event.source.user_id] = p; card_data = db_core.make_battle_card(log, p, enemy)
                 
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "戰鬥回合", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-            with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+            with ApiClient(configuration) as api_client:
+                messaging_api = MessagingApi(api_client)
+                messaging_api.reply_message(ReplyMessageRequest.from_dict(msg_payload))
     else:
         card_data = db_core.make_battle_card("💡 系統提示：請利用螢幕最下方可以左右橫向滑動的小圖標，直接點擊按鈕來展開您的冒險旅程！", p, None)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "冒險導引", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        with ApiClient(configuration) as api_client:
+            messaging_api = MessagingApi(api_client)
+            messaging_api.reply_message(ReplyMessageRequest.from_dict(msg_payload))
