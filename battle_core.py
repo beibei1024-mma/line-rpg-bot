@@ -9,7 +9,7 @@ import bag
 import jobs
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【全功能神作版戰鬥大腦】實裝隨機爆裝系統與全服 Boss 首殺廣播推播"""
+    """【Quick Reply 完全體大腦】實裝防斷電空值防禦機制，瓦解 NoneType + 25 閃退」"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -40,9 +40,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
     men_val = int(base_men * job_mod["men_mod"])
     
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
-    if "mp" not in p: p["mp"] = calculated_max_mp
+    # ✨ 智慧防護：如果載入的舊存檔 mp 欄位本身為 None，立刻就地初始化為最大魔力
+    if p.get("mp") is None: p["mp"] = calculated_max_mp
 
-    # ⚔️ 企劃一：讀取新版 weapons.py 的實體武器加成，若不存在則保底為 0
     current_weapon = p.get("weapon", "赤手空拳")
     w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
 
@@ -171,7 +171,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 "type": "box", "layout": "vertical", "spacing": "sm",
                 "contents": [
                     {"type": "text", "text": "📖 勇者神聖法術技能書", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-                    {"type": "text", "text": f"當前魔力殘餘：🔷 {p['mp']} 點", "size": "xs", "color": "#34AADC", "align": "center"},
+                    {"type": "text", "text": f"當前魔力殘餘：🔷 {p.get('mp', calculated_max_mp)} 點", "size": "xs", "color": "#34AADC", "align": "center"},
                     {"type": "separator", "margin": "sm"},
                     {"type": "box", "layout": "vertical", "spacing": "xs", "contents": buttons}
                 ]
@@ -189,6 +189,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         log = ""
         is_skill = user_msg.startswith("使用技能")
         skill_name = user_msg.replace("使用技能", "").strip() if is_skill else ""
+        
+        # ✨ 安全確保：如果進入戰鬥時 mp 遺失，立刻補齊防禦
+        if p.get("mp") is None: p["mp"] = calculated_max_mp
         
         if is_skill:
             if skill_name not in job_mod["skills"]:
@@ -248,25 +251,27 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
             gold_data = enemy["gold_range"]
-            final_gold = int(random.randint(int(gold_data[0]), int(gold_data[1])) * gold_mod)
+            final_gold = int(random.randint(int(gold_data), int(gold_data)) * gold_mod)
             
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
-            p["mp"] = min(calculated_max_mp, p.get("mp", calculated_max_mp) + 25)
+            
+            # ✨ 【Bug 完美防守點】使用確切的安全值判定，徹底消滅 NoneType + 25 崩潰
+            safe_current_mp = p.get("mp") if p.get("mp") is not None else calculated_max_mp
+            p["mp"] = min(calculated_max_mp, safe_current_mp + 25)
             
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力值自然冥想恢復 +25 點。\n"
             
-            # 💎 企劃一：5% 驚喜爆裝機制！直接掉落與目前地圖匹配的專屬武器
+            # 5% 驚喜爆裝機制
             if random.random() < 0.05:
                 current_loc = p.get("current_map", "新手村")
-                # 遍歷武器大庫，抽取名稱含有地圖關鍵字的武器
                 matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if current_loc[:2] in w_name or (current_loc == "新手村" and "新手" in w_name)]
                 if matched_weapons:
                     drop_w = random.choice(matched_weapons)
                     p["weapon"] = drop_w
                     log += f"💎 🔥 🗺️ 【神裝降臨】！你驚喜搜刮到了該區域的專屬神兵：⚔️【{drop_w}】！已自動裝備，傷害大幅狂飆！\n"
 
-            # 📢 企劃三：全服首殺推播廣播機制！當擊敗克蘇魯或巨龍時，向全服 LINE 發送捷報
+            # 全服首殺公告推播
             raw_monster_name = enemy["name"]
             if "地獄紅蓮巨龍" in raw_monster_name or "邪神克蘇魯" in raw_monster_name:
                 try:
@@ -313,7 +318,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             if "暴雨滂沱" in env_str: vit_val = int(vit_val * 0.8)
             if "魔能潮汐" in env_str and skill_name == "火球術": log += "🌀 【環境魔能湧動】！火球術威力額外暴衝！\n"
             if "精神污染" in enemy.get("skill", ""):
-                p["mp"] = max(0, p["mp"] - 20)
+                # ✨ 安全保護點
+                safe_current_mp = p.get("mp") if p.get("mp") is not None else calculated_max_mp
+                p["mp"] = max(0, safe_current_mp - 20)
                 log += f"\n👁️ 🚨 邪神被動【精神污染】！魔力值被吸走 20 點！"
 
             final_m_atk = random.randint(1, enemy["atk"])
@@ -338,10 +345,27 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             msg_payload = {
                 "replyToken": event.reply_token,
                 "messages": [{
-                    "type": "flex", "altText": "戰鬥回合", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]
+                    "type": "flex", "altText": "戰鬥回合",
+                    "contents": card_data["flex"],
+                    "quickReply": card_data["quick_reply"]
                 }]
             }
             with ApiClient(configuration) as api_client:
+                            # ── 3. 萬能字典非同步封裝回傳 ──
+            with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+                
     else:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請點擊下方 QuickReply 智慧小按鈕開始冒險！"))
+        # 🛑 【戰鬥大腦終極防呆】如果收到完全不認得的口令，強制亮到底部常駐小圖卡，引導玩家回正軌
+        card_data = db_core.make_battle_card("💡 系統提示：請利用螢幕最下方可以左右橫向滑動的小圖標，直接點擊按鈕來展開您的冒險旅程！", p, None)
+        msg_payload = {
+            "replyToken": event.reply_token,
+            "messages": [{
+                "type": "flex", 
+                "altText": "冒險導引",
+                "contents": card_data["flex"],
+                "quickReply": card_data["quick_reply"]
+            }]
+        }
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
