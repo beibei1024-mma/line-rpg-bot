@@ -4,7 +4,7 @@ import jobs
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
 def get_status_card(p):
-    """👤 【狀態面板 2.0 矩陣完全體】依指定格式橫向並排，呈現精品級 RPG 面板"""
+    """👤 【狀態面板 2.0 矩陣過審版】精準導正顏色編碼，徹底消滅 400 Bad Request 閃退"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
@@ -58,7 +58,7 @@ def get_status_card(p):
                 ]},
                 {"type": "separator", "color": "#333333"},
                 
-                # ⚔️ 欄位一：核心屬性欄 (三格並排 × 2層 = 完美六圍)
+                # ⚔️ 欄位一：核心屬性欄
                 {"type": "text", "text": "🧬 【 核心天賦主屬性 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
                 {"type": "box", "layout": "horizontal", "contents": [
                     {"type": "text", "text": f"💪 力量: {str_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
@@ -72,7 +72,7 @@ def get_status_card(p):
                 ]},
                 {"type": "separator", "color": "#222222", "margin": "sm"},
                 
-                # ⚔️ 欄位二：攻防進階欄 (兩格並排 × 2層 = 四大數據)
+                # ⚔️ 欄位二：攻防進階欄
                 {"type": "text", "text": "⚔️ 【 戰術攻防進階值 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
                 {"type": "box", "layout": "horizontal", "contents": [
                     {"type": "text", "text": f"💥 物傷: {p_atk_min}~{p_atk_max}", "size": "xs", "color": "#FF9500", "flex": 1},
@@ -84,7 +84,7 @@ def get_status_card(p):
                 ]},
                 {"type": "separator", "color": "#222222", "margin": "sm"},
                 
-                # ⚔️ 欄位三：戰術機率欄 (兩格並排 = 雙暴率)
+                # ⚔️ 欄位三：戰術機率欄
                 {"type": "text", "text": "🎲 【 戰場觸發修正率 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
                 {"type": "box", "layout": "horizontal", "contents": [
                     {"type": "text", "text": f"💨 連擊率: {double_chance}%", "size": "xs", "color": "#E0E0E0", "flex": 1},
@@ -92,10 +92,11 @@ def get_status_card(p):
                 ]},
                 {"type": "separator", "color": "#222222", "margin": "sm"},
                 
-                # ⚔️ 欄位四：狀態上限欄 (生命、魔力極致對齊)
+                # ⚔️ 欄位四：狀態上限欄
                 {"type": "text", "text": "📊 【 當前狀態精準值 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
                 {"type": "box", "layout": "horizontal", "contents": [
-                    {"type": "text", "text": f"💖 血量: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#4CD96 green", "flex": 1},
+                    # ✨ 【Bug 完美校正】將錯位的顏色編碼精準修正回官方過審 HEX 綠色碼：#4CD964！
+                    {"type": "text", "text": f"💖 血量: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#4CD964", "flex": 1},
                     {"type": "text", "text": f"🔷 魔力: {current_mp} / {calculated_max_mp}", "size": "xs", "color": "#007AFF", "flex": 1}
                 ]}
             ]
