@@ -1,7 +1,8 @@
 import db_core
 
-# 🌐 完整 20 張地圖的等級限制與詳細敘述數據庫
+# 🌐 完整 20 張地圖與新增「皇家主城」的等級限制與詳細敘述數據庫
 MAPS_DATA = {
+    "主城": {"level_req": 1, "desc": "🏙️ 皇家安全城鎮。禁止械鬥，聚集了各行各業的 NPC 補給大師。"},
     "新手村": {"level_req": 1, "desc": "🌲 冒險者誕生的小聚落。"},
     "微光森林": {"level_req": 5, "desc": "🌳 螢光菇散落的迷幻之森。"},
     "寒冰極地": {"level_req": 10, "desc": "❄️ 萬年不化的封印雪原。"},
@@ -25,14 +26,14 @@ MAPS_DATA = {
 }
 
 def get_maps_carousel(p):
-    """【視覺化傳送陣大進階】動態把 20 張地圖包裝成 4 頁可左右滑動的 Carousel 按鈕圖卡"""
+    """【世界傳送廊 v2.0】動態把地圖包裝成 4 頁可左右滑動的 Carousel 按鈕圖卡"""
     map_list = list(MAPS_DATA.items())
     columns = []
     
-    # 每次塞 5 張地圖進入一個頁籤卡片 (1 個 bubble)
-    for i in range(0, len(map_list), 5):
-        chunk = map_list[i:i+5]
-        page_num = (i // 5) + 1
+    # 每次塞 6 張地圖進入一個頁籤卡片 (1 個 bubble)
+    for i in range(0, len(map_list), 6):
+        chunk = map_list[i:i+6]
+        page_num = (i // 6) + 1
         
         body_contents = [
             {"type": "text", "text": f"🗺️ 世界傳送陣 - 第 {page_num} 頁", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
@@ -43,10 +44,10 @@ def get_maps_carousel(p):
         
         for name, info in chunk:
             if p["level"] >= info["level_req"]:
-                btn_color = "#007AFF" # 滿足等級門檻：可點擊的亮藍色按鈕
-                btn_label = f"📍前往 {name} (Lv.{info['level_req']})"
+                btn_color = "#007AFF" if name == "主城" else "#1478FF" # 主城特別亮藍色
+                btn_label = f"📍前往 {name}" if name == "主城" else f"📍前往 {name} (Lv.{info['level_req']})"
             else:
-                btn_color = "#444444" # 等級不足：鎖定的低調灰色按鈕
+                btn_color = "#444444" 
                 btn_label = f"🔒 {name} (需 Lv.{info['level_req']})"
                 
             footer_buttons.append({
@@ -69,22 +70,23 @@ def get_maps_carousel(p):
     return {"type": "carousel", "contents": columns}
 
 def change_map(p, target_map):
-    """處理傳送判定邏輯，精準切碎口令提取地名"""
+    """處理時空傳送邏輯，精準切碎口令"""
     target_map = target_map.replace("前往", "").replace("傳送", "").replace(" ", "").strip()
     
     if target_map not in MAPS_DATA:
-        return f"❌ 傳送失敗！地圖庫中沒有【{target_map}】這張地圖。"
+        return f"❌ 傳送失敗！時空地圖庫中沒有【{target_map}】這張地圖。"
         
     info = MAPS_DATA[target_map]
     if p["level"] < info["level_req"]:
-        return f"🔒 傳送失敗！【{target_map}】限制等級為 Lv.{info['level_req']}+，你目前只有 Lv.{p['level']}，請繼續歷練！"
+        return f"🔒 傳送失敗！【{target_map}】限制門檻為 Lv.{info['level_req']}+，你目前只有 Lv.{p['level']}。"
         
     if p.get("current_map") == target_map:
-        return f"📍 你目前已經在【{target_map}】了，不需要重複傳送。"
+        return f"📍 你目前已經在【{target_map}】區域了，不需要重複傳送。"
         
     if p["enemy"] is not None:
-        return "❌ 傳送失敗！你的眼前還卡著一隻怪物，請先打倒牠或【逃跑】後才能傳送！"
+        return "❌ 傳送失敗！你的眼前還卡著一隻野外怪物，請先打倒牠或選擇【逃跑】後才能引導傳送陣！"
 
+    # ✨ 核心地圖管線寫入
     p["current_map"] = target_map
     db_core.save_player(p)
-    return f"✨ 🔮 傳送成功！你已成功穿越時空傳送陣，抵達了——📍【{target_map}】！\n\n{info['desc']}"
+    return f"✨ 🔮 傳送成功！時空法陣光芒收束，你已順利跨越時空抵達 ── 📍【{target_map}】！\n\n{info['desc']}"
