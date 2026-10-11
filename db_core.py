@@ -3,7 +3,6 @@ import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# 🚀 本地快取記憶體暫存區：普通互毆扣血只在本地計算，打死怪才同步回雲端，大幅提升回傳速度
 MEMORY_PLAYERS = {}
 
 def get_db_connection():
@@ -21,7 +20,7 @@ def load_player(user_id):
     
     if not player:
         cur.execute(
-            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0)",
+            "INSERT INTO players (user_id, hp, max_hp, mp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points) VALUES (%s, 100, 100, 50, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0)",
             (user_id,)
         )
         conn.commit()
@@ -44,8 +43,8 @@ def save_player(p):
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
     
     cur.execute(
-        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s WHERE user_id=%s",
-        (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
+        "UPDATE players SET hp=%s, max_hp=%s, mp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s WHERE user_id=%s",
+        (p['hp'], p['max_hp'], p.get('mp', 50), p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
          p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p['user_id'])
     )
     conn.commit()
@@ -53,18 +52,16 @@ def save_player(p):
     conn.close()
 
 def make_battle_card(title, p, enemy):
-    """【視覺化按鈕圖卡升級版】動態生成附帶行動按鈕的 Flex Message 卡片"""
+    """【企劃 B 天氣動態連動版】融合環境異常標籤的終極戰鬥面板"""
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
     
-    # 計算血量上限
     base_vit = p.get("vitality", 10 + (level * 3))
     vit_val = int(base_vit * job_mod["vit_mod"])
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     
-    # 計算魔力上限
     base_men = p.get("sprit", 10 + (level * 2))
     men_val = int(base_men * job_mod["men_mod"])
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
@@ -81,23 +78,25 @@ def make_battle_card(title, p, enemy):
                 
     contents = []
     
-    # ⚔️ 1. 頂部動態戰報標頭
-    if "擊敗對手" in title:
-        header_title = "🏆 戰鬥大獲全勝 🏆"
-    elif "突破成功" in title:
-        header_title = "✨ 天賦覺醒突破 ✨"
-    elif "配點成功" in title:
-        header_title = "💪 屬性天賦加點 💪"
-    elif p["hp"] <= 0:
-        header_title = "☠️ 勇者不幸陣亡 ☠️"
-    else:
-        header_title = "⚔️ 戰場即時動態 ⚔️"
+    # 🧠 戰報動態標頭判定
+    if "擊敗對手" in title: header_title = "🏆 戰鬥大獲全勝 🏆"
+    elif "突破成功" in title: header_title = "✨ 天賦覺醒突破 ✨"
+    elif "配點成功" in title: header_title = "💪 屬性天賦加點 💪"
+    elif p["hp"] <= 0: header_title = "☠️ 勇者不幸陣亡 ☠️"
+    else: header_title = "⚔️ 戰場即時動態 ⚔️"
         
     contents.append({"type": "text", "text": header_title, "weight": "bold", "size": "md", "align": "center", "color": "#FFFFFF"})
     contents.append({"type": "separator", "margin": "md"})
+    
+    # ✨ 企劃 B：如果正在戰鬥中，顯示目前地圖的特殊天象環境
+    if enemy and "env" in enemy:
+        contents.append({
+            "type": "box", "layout": "horizontal", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
+            "contents": [{"type": "text", "text": f"🌀 戰場環境：{enemy['env']}", "size": "xs", "color": "#FFCC00", "weight": "bold"}]
+        })
+        
     contents.append({"type": "text", "text": str(title), "size": "sm", "wrap": True, "margin": "md", "color": "#E0E0E0"})
     
-    # 👾 2. 敵方怪物血條區
     if enemy: 
         e_pct = max(0, min(100, int((enemy["hp"] / enemy["max_hp"]) * 100)))
         contents.extend([
@@ -107,40 +106,29 @@ def make_battle_card(title, p, enemy):
             get_bar(e_pct, "#FF3B30")
         ])
         
-    # 👤 3. 勇者狀態與雙血條區
     contents.extend([
         {"type": "separator", "margin": "md"}, 
-        {"type": "text", "text": f"👤 勇者進度 ({current_job} Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
+        {"type": "text", "text": f"👤 勇者狀態 ({current_job} Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
         {"type": "text", "text": f"血量狀態: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
         get_bar(p_pct, "#4CD964"),
         {"type": "text", "text": f"魔力狀態: {current_mp} / {calculated_max_mp}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, 
         get_bar(mp_pct, "#34AADC")
     ])
     
-    # 🕹️ 4. 底部智慧型動態按鈕選單 (Footer Box)
     footer_contents = []
-    
     if p["hp"] <= 0:
-        # 💀 狀況 A：玩家陣亡，強制只能點擊復活
-        footer_contents.append({
-            "type": "button", "style": "primary", "color": "#8E8E93", "height": "sm",
-            "action": {"type": "message", "label": "😇 祈求神聖復活", "text": "復活"}
-        })
+        footer_contents.append({"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "action": {"type": "message", "label": "😇 祈求神聖復活", "text": "復活"}})
     elif enemy:
-        # ⚔️ 狀況 B：戰鬥進行中，帶出戰鬥鐵三角按鈕
+        # ⚡ 企劃 A：點擊「技能」按鈕，觸發文字改為「技能書」指令，用來叫出技能快捷卡片！
         footer_contents.append({
             "type": "box", "layout": "horizontal", "spacing": "sm",
             "contents": [
-                {"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "action": {"type": "message", "label": "🗡️ 攻擊", "text": "攻擊"}},
-                {"type": "button", "style": "primary", "color": "#34AADC", "height": "sm", "action": {"type": "message", "label": "🔮 技能", "text": "技能"}}
+                {"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "action": {"type": "message", "label": "攻擊", "text": "攻擊"}},
+                {"type": "button", "style": "primary", "color": "#5856D6", "height": "sm", "action": {"type": "message", "label": "開技能書", "text": "技能書"}}
             ]
         })
-        footer_contents.append({
-            "type": "button", "style": "secondary", "height": "sm", "marginTop": "sm",
-            "action": {"type": "message", "label": "🏃 嘗試逃跑", "text": "逃跑"}
-        })
+        footer_contents.append({"type": "button", "style": "secondary", "height": "sm", "marginTop": "sm", "action": {"type": "message", "label": "🏃 嘗試逃跑", "text": "逃跑"}})
     else:
-        # 🌲 狀況 C：閒置狀態（沒怪），帶出探索與移動按鈕
         footer_contents.append({
             "type": "box", "layout": "horizontal", "spacing": "sm",
             "contents": [
@@ -149,24 +137,9 @@ def make_battle_card(title, p, enemy):
             ]
         })
     
-    # 建立最終完整的卡片結構（底色改為高質感深色系主題 #1C1C1E）
-    flex_bubble = {
+    return {
         "type": "bubble",
-        "styles": {
-            "body": {"backgroundColor": "#1C1C1E"},
-            "footer": {"backgroundColor": "#2C2C2E", "separator": True}
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": contents
-        },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "xs",
-            "contents": footer_contents
-        }
+        "styles": {"body": {"backgroundColor": "#1C1C1E"}, "footer": {"backgroundColor": "#2C2C2E", "separator": True}},
+        "body": {"type": "box", "layout": "vertical", "contents": contents},
+        "footer": {"type": "box", "layout": "vertical", "spacing": "xs", "contents": footer_contents}
     }
-    
-    return flex_bubble
