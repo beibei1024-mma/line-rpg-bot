@@ -14,7 +14,7 @@ from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
 from linebot.models import TextSendMessage, FlexSendMessage
 
 def process_game_logic(event, line_bot_api, configuration):
-    """【皇家主控台 戰場殘留解鎖版】全自動清除主城殘留怪物，徹底封印傳送死鎖"""
+    """【皇家分流主控台 完全體】精準校正背包回圈路由，徹底消滅 AttributeError"""
     user_id = event.source.user_id
     user_msg = event.message.text.replace(" ", "").strip()
     
@@ -24,7 +24,6 @@ def process_game_logic(event, line_bot_api, configuration):
     # 🏙️ 快捷口令：回城 / 飛回城鎮 
     if user_msg == "回城" or user_msg == "飛回城鎮" or user_msg == "傳送主城":
         p["current_map"] = "主城"
-        # ✨ 【死鎖安全防禦】回到主城安全區時，全自動將殘留的野外怪獸清除，防範傳送陣卡死
         p["enemy"] = None
         db_core.save_player(p)
         card_data = db_core.make_battle_card(f"🦅 ✨ 飛向天空！你引導傳送羽毛，順利回到安全城鎮：📍【 主城 】！\n\n🏪 城市功能（補給商店、每日簽到、工坊、挑戰賽）已全數為您解鎖！", p, None)
@@ -32,30 +31,36 @@ def process_game_logic(event, line_bot_api, configuration):
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 1. 基礎狀態查詢分流 (全區開放)
+    # 👤 1. 處理【我的狀態】面板 
     if user_msg == "我的狀態" or user_msg == "狀態":
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的狀態面板", contents=player.get_status_card(p)))
+        card_data = player.get_status_card(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的狀態面板", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+        
+    # 🎒 2. 處理【我的背包】倉庫 ➡️ ✨ 【Bug 終極校正點】改用標準 v3 Dict 非同步發送模型，完美咬合對齊！
     elif user_msg == "我的背包" or user_msg == "背包":
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的私人物品倉庫", contents=bag.get_bag_card(p)))
+        card_data = bag.get_bag_card(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的私人物品倉庫", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+        
+    # 🛡️ 3. 處理【我的裝備】裝備欄
     elif user_msg == "我的裝備" or user_msg == "裝備":
         card_data = forge_system.get_equipment_card(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的神聖裝備欄", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+        
     elif user_msg == "脫下裝備":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
         return
-        
     elif user_msg == "世界地圖" or user_msg == "出城冒險":
-        # ✨ 【死鎖安全防禦】當玩家人在主城且開啟世界地圖時，再度強制清洗一次殘留怪獸，確保 100% 傳送順暢！
         if current_loc == "主城" and p["enemy"] is not None:
             p["enemy"] = None
             db_core.save_player(p)
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟世界傳送選單", contents=maps.get_maps_carousel(p)))
         return
-        
     elif user_msg.startswith("前往") or user_msg.startswith("傳送"):
         res_text = maps.change_map(p, user_msg)
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res_text))
@@ -122,7 +127,7 @@ def process_game_logic(event, line_bot_api, configuration):
                 with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
         elif user_msg in ["尋找怪物", "尋怪", "攻擊", "使用技能"]:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖擺【🚪 出城冒險】傳送至野外獵怪！"))
             return
 
     # 🌲 處於野外危險區的指令導流
