@@ -1,4 +1,6 @@
 import random
+# 🚀 導入最新版 MessagingApi 發送模組
+from linebot.v3.messaging import ReplyMessageRequest, FlexMessage, FlexContainer, MessagingApi, ApiClient
 from linebot.models import TextSendMessage, FlexSendMessage
 
 import db_core
@@ -7,17 +9,18 @@ import weapons
 import bag
 import jobs
 
-def process_battle_logic(event, line_bot_api, p, user_msg):
+def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
+    """【Quick Reply 適配版大腦】全面支援橫向滑動小圖標按鈕選單發送"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
     job_mod = jobs.JOBS_DATA[current_job]
 
-    # ✨ 【Bug B 完美解包攔截】若玩家少打字輸入「背包」或「狀態」，在此幫忙自動導流回正軌
-    if user_msg == "背包":
+    # ✨ 智慧攔截：若玩家點擊了底部滑動選單的「我的背包」或「我的狀態」
+    if user_msg == "我的背包" or user_msg == "背包":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的私人物品倉庫", contents=bag.get_bag_card(p)))
         return
-    elif user_msg == "狀態":
+    elif user_msg == "我的狀態" or user_msg == "狀態":
         import player
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的狀態面板", contents=player.get_status_card(p)))
         return
@@ -57,8 +60,15 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             return
         p["job"] = target_job
         db_core.save_player(p)
-        log_text = f"✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 你正式進階為更高的職業形態——🔥【{target_job}】！\n輸入【我的狀態】查看全新戰力！"
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="轉職成功", contents=db_core.make_battle_card(log_text, p, None)))
+        log_text = f"✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 你正式進階為更高的職業形態——🔥【{target_job}】！\n點擊底部【狀態】小圖卡查看全新戰力！"
+        
+        # 👑 使用新版 v3 SDK 發送帶有滑動小圖標按鈕的訊息
+        card_data = db_core.make_battle_card(log_text, p, None)
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[FlexMessage(alt_text="轉職成功", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
+            ))
         return
 
     # 轉職卡關防呆
@@ -100,23 +110,35 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         p["attribute_points"] = free_pts - pts_to_add
         db_core.save_player(p)
         reply_log = f"💪 【配點成功】！你將 {pts_to_add} 點潛能點數分配給了──✨【{attr_name}】屬性！"
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="配點成功", contents=db_core.make_battle_card(reply_log, p, None)))
+        
+        card_data = db_core.make_battle_card(reply_log, p, None)
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[FlexMessage(alt_text="配點成功", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
+            ))
         return
 
     # C. 尋找怪物處理
     elif user_msg in ["尋找怪物", "尋怪"]:
         if p["hp"] <= 0:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請先【復活】。"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊底部【😇 祈求復活】小圖卡。"))
             return
         if p["enemy"] is not None:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚔️ 眼前還有怪物！請輸入【攻擊】或點擊【技能書】！"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚔️ 眼前還有怪物！請點擊底部滑動選單的【🗡️ 攻擊】！"))
             return
         current_location = p.get("current_map", "新手村")
         random_monster = monsters.generate_random_monster(current_location)
         p["enemy"] = random_monster
         db_core.save_player(p)
         title_log = f"⚠️ 遭遇強敵！在📍【{current_location}】撞見了對手！\n\n📢 環境狀態：{random_monster['env']}\n🔰 怪物被動：{random_monster['skill']}"
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遭遇怪物", contents=db_core.make_battle_card(title_log, p, random_monster)))
+        
+        card_data = db_core.make_battle_card(title_log, p, random_monster)
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[FlexMessage(alt_text="遭遇怪物", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
+            ))
         return
 
     # 處理【技能書】呼叫判定
@@ -149,8 +171,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         }
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟技能書", contents=flex_menu))
         return
-    # D. 處理【攻擊】與【使用技能】核心戰鬥扣血邏輯
-    # ✨ 【Bug C 完美修復】將漏掉的 == 補齊，確保邏輯精準命中
+    # D. 處理【攻擊 / 使用技能】核心戰鬥扣血與 Quick Reply 聯動
     elif user_msg == "攻擊" or user_msg.startswith("使用技能"):
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法發動攻擊（可能已陣亡或周圍沒有怪物）。"))
@@ -226,7 +247,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力值自然冥想恢復 +25 點。\n"
             
-            # ✨ 【Bug A 完美修復】移除了多餘的本機 import bag，改用開頭宣告好的正牌全域 bag 物件
             if random.random() < 0.50 and enemy.get("drop_item"):
                 bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
                 log += f"💎 【幸運掉寶】！搜刮到了素材：【{enemy['drop_item']}】x1！\n"
@@ -241,11 +261,17 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                 
             p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
             db_core.save_player(p)
-            line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥結束", contents=db_core.make_battle_card(log, p, None)))
+            
+            # 使用新版 v3 SDK 發送戰鬥勝利卡片
+            card_data = db_core.make_battle_card(log, p, None)
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(alt_text="戰鬥結束", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
+                ))
         else:
             # ── 3. 怪物反擊與環境效果連動 ──
             env_str = enemy.get("env", "")
-            
             if "暴雨滂沱" in env_str: vit_val = int(vit_val * 0.8)
             if "魔能潮汐" in env_str and skill_name == "火球術": log += "🌀 【環境魔能湧動】！火球術威力額外暴衝！\n"
             if "精神污染" in enemy.get("skill", ""):
@@ -264,13 +290,18 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             if p["hp"] <= 0:
                 p["hp"] = 0
                 p["enemy"] = None
-                log += "\n💀 你受傷過重陣亡了！請使用【復活】法術重整旗鼓。"
+                log += "\n💀 你受傷過重陣亡了！請點擊底部【😇 祈求復活】小圖卡。"
                 db_core.save_player(p)
-                card = db_core.make_battle_card(log, p, None)
+                card_data = db_core.make_battle_card(log, p, None)
             else:
                 db_core.MEMORY_PLAYERS[event.source.user_id] = p
-                card = db_core.make_battle_card(log, p, enemy)
+                card_data = db_core.make_battle_card(log, p, enemy)
                 
-            line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="戰鬥回合", contents=card))
+            # 使用新版 v3 SDK 發送回合戰報與底部的動態滑動小圖標
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(alt_text="戰鬥回合", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
+                ))
     else:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請點擊下方選單開始冒險！"))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請點擊下方 QuickReply 智慧小按鈕開始冒險！"))
