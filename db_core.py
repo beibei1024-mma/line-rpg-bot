@@ -3,6 +3,9 @@ import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+# 🚀 LINE v3 SDK 必備的快速回應物件元件導入
+from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
+
 MEMORY_PLAYERS = {}
 
 def get_db_connection():
@@ -12,27 +15,22 @@ def get_db_connection():
 def load_player(user_id):
     if user_id in MEMORY_PLAYERS:
         return MEMORY_PLAYERS[user_id]
-        
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
     player = cur.fetchone()
-    
     if not player:
         cur.execute(
-            "INSERT INTO players (user_id, hp, max_hp, mp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points) VALUES (%s, 100, 100, 50, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0)",
+            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0)",
             (user_id,)
         )
         conn.commit()
         cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
-        
     cur.close()
     conn.close()
-    
     if player and player['enemy']: 
         player['enemy'] = json.loads(player['enemy'])
-        
     MEMORY_PLAYERS[user_id] = dict(player)
     return MEMORY_PLAYERS[user_id]
 
@@ -41,10 +39,9 @@ def save_player(p):
     conn = get_db_connection()
     cur = conn.cursor()
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
-    
     cur.execute(
-        "UPDATE players SET hp=%s, max_hp=%s, mp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s WHERE user_id=%s",
-        (p['hp'], p['max_hp'], p.get('mp', 50), p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
+        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s WHERE user_id=%s",
+        (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
          p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p['user_id'])
     )
     conn.commit()
@@ -52,18 +49,16 @@ def save_player(p):
     conn.close()
 
 def make_battle_card(title, p, enemy):
-    """【企劃 B 天氣動態連動版】融合環境異常標籤的終極戰鬥面板"""
+    """【Quick Reply 小圖標智慧版】生成無按鈕乾淨卡片，並將所有行動化為底部滑動小圖標"""
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
     
-    base_vit = p.get("vitality", 10 + (level * 3))
-    vit_val = int(base_vit * job_mod["vit_mod"])
+    # 計算血量與魔力
+    vit_val = int(p.get("vitality", 10 + (level * 3)) * job_mod["vit_mod"])
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
-    
-    base_men = p.get("sprit", 10 + (level * 2))
-    men_val = int(base_men * job_mod["men_mod"])
+    men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
     current_mp = p.get("mp", calculated_max_mp)
     
@@ -78,7 +73,7 @@ def make_battle_card(title, p, enemy):
                 
     contents = []
     
-    # 🧠 戰報動態標頭判定
+    # 🧠 戰報標頭狀態判定
     if "擊敗對手" in title: header_title = "🏆 戰鬥大獲全勝 🏆"
     elif "突破成功" in title: header_title = "✨ 天賦覺醒突破 ✨"
     elif "配點成功" in title: header_title = "💪 屬性天賦加點 💪"
@@ -88,7 +83,6 @@ def make_battle_card(title, p, enemy):
     contents.append({"type": "text", "text": header_title, "weight": "bold", "size": "md", "align": "center", "color": "#FFFFFF"})
     contents.append({"type": "separator", "margin": "md"})
     
-    # ✨ 企劃 B：如果正在戰鬥中，顯示目前地圖的特殊天象環境
     if enemy and "env" in enemy:
         contents.append({
             "type": "box", "layout": "horizontal", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
@@ -115,31 +109,34 @@ def make_battle_card(title, p, enemy):
         get_bar(mp_pct, "#34AADC")
     ])
     
-    footer_contents = []
-    if p["hp"] <= 0:
-        footer_contents.append({"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "action": {"type": "message", "label": "😇 祈求神聖復活", "text": "復活"}})
-    elif enemy:
-        # ⚡ 企劃 A：點擊「技能」按鈕，觸發文字改為「技能書」指令，用來叫出技能快捷卡片！
-        footer_contents.append({
-            "type": "box", "layout": "horizontal", "spacing": "sm",
-            "contents": [
-                {"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "action": {"type": "message", "label": "攻擊", "text": "攻擊"}},
-                {"type": "button", "style": "primary", "color": "#5856D6", "height": "sm", "action": {"type": "message", "label": "開技能書", "text": "技能書"}}
-            ]
-        })
-        footer_contents.append({"type": "button", "style": "secondary", "height": "sm", "marginTop": "sm", "action": {"type": "message", "label": "🏃 嘗試逃跑", "text": "逃跑"}})
-    else:
-        footer_contents.append({
-            "type": "box", "layout": "horizontal", "spacing": "sm",
-            "contents": [
-                {"type": "button", "style": "primary", "color": "#4CD964", "height": "sm", "action": {"type": "message", "label": "🔍 尋找怪物", "text": "尋怪"}},
-                {"type": "button", "style": "secondary", "height": "sm", "action": {"type": "message", "label": "🗺️ 世界地圖", "text": "世界地圖"}}
-            ]
-        })
-    
-    return {
+    # 🌟 核心改動：卡片本身保持乾淨無按鈕，純黑底高質感
+    flex_bubble = {
         "type": "bubble",
-        "styles": {"body": {"backgroundColor": "#1C1C1E"}, "footer": {"backgroundColor": "#2C2C2E", "separator": True}},
-        "body": {"type": "box", "layout": "vertical", "contents": contents},
-        "footer": {"type": "box", "layout": "vertical", "spacing": "xs", "contents": footer_contents}
+        "styles": {"body": {"backgroundColor": "#1C1C1E"}},
+        "body": {"type": "box", "layout": "vertical", "contents": contents}
     }
+    
+    # 🕹️ 動態生成手機底部 QuickReply 小按鈕清單（像您圖中圈起來的橫排樣式）
+    quick_items = []
+    
+    if p["hp"] <= 0:
+        # 💀 狀況 1：勇者陣亡
+        quick_items.append(QuickReplyItem(action=MessageAction(label="😇 祈求復活", text="復活")))
+    elif enemy:
+        # ⚔️ 狀況 2：戰鬥中（出現戰鬥快捷按鈕，不相干的自動藏起來，非常乾淨）
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🗡️ 攻擊", text="攻擊")))
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🔮 技能書", text="技能書")))
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🏃 逃跑", text="逃跑")))
+    else:
+        # 🌲 狀況 3：非戰鬥狀態中（冒險大清單，可以無限橫向滑動）
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🔍 尋找怪物", text="尋怪")))
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")))
+        quick_items.append(QuickReplyItem(action=MessageAction(label="👤 我的狀態", text="我的狀態")))
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🗺️ 世界地圖", text="世界地圖")))
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🏪 冒險商店", text="冒險商店")))
+
+    # 包裝成 SDK 物件
+    quick_reply_object = QuickReply(items=quick_items)
+    
+    # 回傳最終的卡片 JSON 與「小圖標快速回應物件」
+    return {"flex": flex_bubble, "quick_reply": quick_reply_object}
