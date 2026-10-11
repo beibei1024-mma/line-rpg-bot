@@ -18,7 +18,6 @@ def load_player(user_id):
     cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
     player = cur.fetchone()
     if not player:
-        # ✨ 初始註冊自動塞入預設未簽到狀態 None
         cur.execute(
             "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points, last_sign_in) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0, 'None')",
             (user_id,)
@@ -38,7 +37,6 @@ def save_player(p):
     conn = get_db_connection()
     cur = conn.cursor()
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
-    # ✨ 核心同步：確保 last_sign_in 資料欄位寫入 Supabase 雲端
     cur.execute(
         "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s, last_sign_in=%s WHERE user_id=%s",
         (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
@@ -49,16 +47,23 @@ def save_player(p):
     conn.close()
 
 def make_battle_card(title, p, enemy):
+    """【真・防彈數據版】加入魔力空值保底，完美相容舊玩家存檔，消除 TypeError 閃退"""
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
     
+    # 計算血量與魔力上限
     vit_val = int(p.get("vitality", 10 + (level * 3)) * job_mod["vit_mod"])
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
-    current_mp = p.get("mp", calculated_max_mp)
+    
+    # ✨ 【Bug 終極防禦】如果舊帳號的 mp 欄位是 None，全自動保底賦予基礎最大魔力值
+    current_mp = p.get("mp")
+    if current_mp is None:
+        current_mp = calculated_max_mp
+        p["mp"] = calculated_max_mp # 同步校正記憶體內的資料
     
     p_pct = max(0, min(100, int((p["hp"] / calculated_max_hp) * 100)))
     mp_pct = max(0, min(100, int((current_mp / calculated_max_mp) * 100)))
@@ -119,7 +124,6 @@ def make_battle_card(title, p, enemy):
         quick_items.append(QuickReplyItem(action=MessageAction(label="🔮 技能書", text="技能書")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🏃 逃跑", text="逃跑")))
     else:
-        # ✨ 企劃二：在底部常駐的滑動選單中，全自動塞入【📆 每日簽到】快捷按鈕！
         quick_items.append(QuickReplyItem(action=MessageAction(label="🔍 尋找怪物", text="尋怪")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="📆 每日簽到", text="簽到")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")))
