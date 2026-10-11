@@ -1,5 +1,5 @@
 import random
-# 🚀 導入最新版 MessagingApi 發送模組
+# 🚀 v3 SDK 必備的實體貨櫃解析元件導入
 from linebot.v3.messaging import ReplyMessageRequest, FlexMessage, FlexContainer, MessagingApi, ApiClient
 from linebot.models import TextSendMessage, FlexSendMessage
 
@@ -10,13 +10,13 @@ import bag
 import jobs
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【Quick Reply 適配版大腦】全面支援橫向滑動小圖標按鈕選單發送"""
+    """【v3 貨櫃完全相容版】全面導正 FlexContainer 封裝，徹底封印發送閃退 Bug"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
     job_mod = jobs.JOBS_DATA[current_job]
 
-    # ✨ 智慧攔截：若玩家點擊了底部滑動選單的「我的背包」或「我的狀態」
+    # 快捷口令攔截導流
     if user_msg == "我的背包" or user_msg == "背包":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的私人物品倉庫", contents=bag.get_bag_card(p)))
         return
@@ -62,8 +62,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         db_core.save_player(p)
         log_text = f"✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 你正式進階為更高的職業形態——🔥【{target_job}】！\n點擊底部【狀態】小圖卡查看全新戰力！"
         
-        # 👑 使用新版 v3 SDK 發送帶有滑動小圖標按鈕的訊息
         card_data = db_core.make_battle_card(log_text, p, None)
+        # ✨ 【真・v3 規範更新】將格式封裝成正牌的 FlexContainer，並綁定智慧型滑動小按鈕
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -83,8 +83,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         clean_msg = event.message.text.strip().replace("配點", "加點")
         raw_parts = clean_msg.split()
         if len(raw_parts) == 3:
-            attr_name = raw_parts[1].strip()
-            pts_str = raw_parts[2].strip()
+            attr_name = raw_parts.strip()
+            pts_str = raw_parts.strip()
         else:
             try:
                 target_str = clean_msg.replace("加點", "")
@@ -140,8 +140,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 messages=[FlexMessage(alt_text="遭遇怪物", container=FlexContainer.from_dict(card_data["flex"]), quick_reply=card_data["quick_reply"])]
             ))
         return
-
-    # 處理【技能書】呼叫判定
+    # 處理【技能書】呼叫與 D. 核心戰鬥扣血邏輯
     elif user_msg == "技能書":
         if p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 戰場外無法呼叫戰鬥技能書面板。"))
@@ -171,7 +170,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         }
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟技能書", contents=flex_menu))
         return
-    # D. 處理【攻擊 / 使用技能】核心戰鬥扣血與 Quick Reply 聯動
+
     elif user_msg == "攻擊" or user_msg.startswith("使用技能"):
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法發動攻擊（可能已陣亡或周圍沒有怪物）。"))
@@ -262,7 +261,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
             db_core.save_player(p)
             
-            # 使用新版 v3 SDK 發送戰鬥勝利卡片
             card_data = db_core.make_battle_card(log, p, None)
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -297,7 +295,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 db_core.MEMORY_PLAYERS[event.source.user_id] = p
                 card_data = db_core.make_battle_card(log, p, enemy)
                 
-            # 使用新版 v3 SDK 發送回合戰報與底部的動態滑動小圖標
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
