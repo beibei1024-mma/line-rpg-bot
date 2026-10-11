@@ -13,6 +13,15 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
     job_mod = jobs.JOBS_DATA[current_job]
 
+    # ✨ 【Bug B 完美解包攔截】若玩家少打字輸入「背包」或「狀態」，在此幫忙自動導流回正軌
+    if user_msg == "背包":
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的私人物品倉庫", contents=bag.get_bag_card(p)))
+        return
+    elif user_msg == "狀態":
+        import player
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的狀態面板", contents=player.get_status_card(p)))
+        return
+
     # 六大屬性初始化
     base_str = p.get("strength", 10 + (level * 3))
     base_agi = p.get("agility", 10 + (level * 2))
@@ -59,7 +68,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔒 【天賦界限卡關中】請先完成手動天賦轉職！\n\n{job_notice}"))
             return
 
-    # B. 處理【加點 / 配點】指令判定 (完美相容有無空白格式)
+    # B. 處理【加點 / 配點】指令判定
     if user_msg.startswith("加點") or user_msg.startswith("配點"):
         clean_msg = event.message.text.strip().replace("配點", "加點")
         raw_parts = clean_msg.split()
@@ -141,7 +150,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟技能書", contents=flex_menu))
         return
     # D. 處理【攻擊】與【使用技能】核心戰鬥扣血邏輯
-    # ✨ 【SyntaxError 語法完美修復】補上漏掉的 in 關鍵字，確保能順利過載編譯！
+    # ✨ 【Bug C 完美修復】將漏掉的 == 補齊，確保邏輯精準命中
     elif user_msg == "攻擊" or user_msg.startswith("使用技能"):
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法發動攻擊（可能已陣亡或周圍沒有怪物）。"))
@@ -186,6 +195,10 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
                     p["hp"] = min(max_h, p["hp"] + h)
                     total_p_dmg = int(int_val * 0.5)
                     log += f"💖 聖光降臨！大幅恢復了 {p['hp'] - old} 點生命值！\n"
+                elif skill_name == "毒刃襲擊":
+                    total_p_dmg = int(agi_val * 1.5) + random.randint(15, 25)
+                elif skill_name == "弒神終結":
+                    total_p_dmg = int((agi_val + luk_val) * 2.5)
                 else:
                     total_p_dmg = int((str_val + agi_val + int_val) * 1.5)
                 log += f"💥 【{skill_name}】重擊命中，造成 {total_p_dmg} 點致命神聖傷害！\n"
@@ -213,9 +226,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
             
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力值自然冥想恢復 +25 點。\n"
             
+            # ✨ 【Bug A 完美修復】移除了多餘的本機 import bag，改用開頭宣告好的正牌全域 bag 物件
             if random.random() < 0.50 and enemy.get("drop_item"):
-                import bag as bg_mod
-                bg_mod.add_to_inventory(p, enemy["drop_item"], is_material=True)
+                bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
                 log += f"💎 【幸運掉寶】！搜刮到了素材：【{enemy['drop_item']}】x1！\n"
                 
             while p["exp"] >= p["level"] * 50:
