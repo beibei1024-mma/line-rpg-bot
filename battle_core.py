@@ -356,7 +356,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
                 
     else:
-        # 🛑 【戰鬥大腦終極防呆】如果收到完全不認得的口令，強制亮到底部常駐小圖卡，引導玩家回正軌
+        # 🛑 【戰鬥大腦終極防呆】如果收到不認得的口令，強制亮到底部常駐小圖卡，引導玩家點擊按鈕
         card_data = db_core.make_battle_card("💡 系統提示：請利用螢幕最下方可以左右橫向滑動的小圖標，直接點擊按鈕來展開您的冒險旅程！", p, None)
         msg_payload = {
             "replyToken": event.reply_token,
@@ -367,5 +367,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 "quickReply": card_data["quick_reply"]
             }]
         }
+        # ✨ 【縮排完美修復】確保 with 內部的這兩行代碼向內縮排四個空格，徹底封印 IndentationError！
         with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+            messaging_api = MessagingApi(api_client)
+            messaging_api.reply_message(ReplyMessageRequest.from_dict(msg_payload))
