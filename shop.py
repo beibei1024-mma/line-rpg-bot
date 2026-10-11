@@ -2,15 +2,16 @@ import json
 import db_core
 import weapons
 import bag
+import forge_system
 
 # 🏪 冒險商店：上架販售的商品數據庫（金幣計價）
-# 您可以自由修改這裡的價格、名稱與庫存種類！
+# ✨ 【文字原樣保留】完全不更動您的武器說明與素質文案，方便您自己修改測試！
 SHOP_ITEMS = {
     # 🧪 【消耗品區】：買完會進到玩家背包 items 裡面
     "初級生命藥水": {"type": "potion", "price": 30, "desc": "隨機恢復 30~50 點生命值。"},
     "高級生命藥水": {"type": "potion", "price": 100, "desc": "隨機恢復 80~120 點生命值。"},
     
-    # ⚔️ 【基礎武器區】：買完直接替換玩家身上的 weapon 裝備欄位並增加攻擊力
+    # ⚔️ 【基礎武器區】：買完後會安全送入背包中的裝備與兵器收藏庫
     "新手鐵短劍": {"type": "weapon", "price": 150, "desc": "物傷 +15。适合剛出村的新手勇者。"},
     "微光木藤弓": {"type": "weapon", "price": 800, "desc": "物傷 +45。森林老獵人常用的木弓。"},
     "凜冬不融碎冰刺": {"type": "weapon", "price": 2500, "desc": "物傷 +95。散發著淡淡寒氣的冰刺。"},
@@ -56,11 +57,13 @@ def get_shop_card(p):
     return {
         "type": "bubble",
         "styles": {"body": {"backgroundColor": "#1A1A1A"}},
-        "body": {"type": "box", "layout": "vertical", "contents": contents}
+        "body": {
+            "type": "box", "layout": "vertical", "contents": contents
+        }
     }
 
 def buy_weapon(p, item_name):
-    """🛒 執行商店交易購買大腦，自動判定錢扣款，核發道具至背包或換裝"""
+    """🛒 商店大腦：買到實體武器 100% 入庫武器備用背包收藏庫，拒絕直接穿戴覆蓋"""
     item_name = item_name.replace("購買", "").replace("下單", "").replace(" ", "").strip()
     
     if item_name not in SHOP_ITEMS:
@@ -77,16 +80,12 @@ def buy_weapon(p, item_name):
     
     # 3. 根據商品類型進行分流核發
     if config["type"] == "potion":
-        # 🧪 如果買的是藥水：呼叫 bag.py 塞進玩家的消耗品背包
         bag.add_to_inventory(p, item_name, is_material=False)
         db_core.save_player(p)
         return f"🛒 🧪 【交易成功】 🧪 🛒\n─────────────────\n你支付了 {config['price']} 金幣，成功購買了【{item_name}】x1！\n📦 物資已為您送入【我的背包】倉庫，輸入【使用 {item_name}】即可喝藥補血！\n\n🪙 剩餘資金：🪙 {p['gold']} 金幣"
         
     elif config["type"] == "weapon":
-        # ⚔️ 如果買的是武器：直接覆蓋替換裝備欄位 `weapon`
-        if p.get("weapon") == item_name:
-            return f"❌ 你目前已經裝備著【{item_name}】了，不需要重複購買一樣的兵器。"
-            
-        p["weapon"] = item_name
+        # ✨ 【背包數據流合流】直接呼叫工坊核心組件，將新買的現貨武器精準送入備用武器庫！
+        forge_system.add_to_weapon_inventory(p, item_name)
         db_core.save_player(p)
-        return f"🛒 ⚔️ 【神兵武裝成功】 ⚔️ 🛒\n─────────────────\n你支付了 {config['price']} 金幣，成功購買了【{item_name}】！\n🔥 鐵匠當場為你換裝！你已成功裝備全新武器 ── ⚔️【{item_name}】！\n\n💡 戰力加成：往後的每一刀普通攻擊與技能，都將獲得該武器的實體物傷加成！輸入【我的狀態】縱覽戰力！"
+        return f"🛒 ⚔️ 【 兵器交易成功 】 🛒 ⚔️\n─────────────────\n你支付了 {config['price']} 金幣，成功購買了現貨基礎兵器 ── ⚔️【{item_name}】！\n\n📦 存放去向：新兵器已妥善存入您的【 我的背包 -> 裝備與兵器收藏庫 】中！\n💡 操作提示：點擊小圖標開啟【我的背包】，即可隨時手動輸入【裝備 {item_name}】進行更換！\n\n🪙 剩餘資金：🪙 {p['gold']} 金幣"
