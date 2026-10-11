@@ -1,5 +1,4 @@
 import random
-# 🚀 導入最安全的純 Dict 發送代理元件
 from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
 from linebot.models import TextSendMessage, FlexSendMessage
 
@@ -10,7 +9,6 @@ import bag
 import jobs
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【萬能 Dict 封裝相容版】全面棄用硬編碼物件，使用純 JSON 結構徹底瓦解參數驗證天坑"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -63,7 +61,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         log_text = f"✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 你正式進階為更高的職業形態——🔥【{target_job}】！"
         
         card_data = db_core.make_battle_card(log_text, p, None)
-        # ✨ 【真・萬能非同步封裝】直接包裝成一體化 Dict 傳送，完美相容新舊所有版本的 contents 欄位
         msg_payload = {
             "replyToken": event.reply_token,
             "messages": [{
@@ -162,7 +159,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             return
         active_skills = {k: v for k, v in job_mod["skills"].items() if v.get("type") == "active"}
         if current_job == "初心者" or not active_skills:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 【初心者】階段尚未覺醒任何秘術招式，請直接普通攻擊！"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 【初心者】階段尚未覺醒 any 秘術招式，請直接普通攻擊！"))
             return
         buttons = []
         for s_name, s_info in active_skills.items():
@@ -253,7 +250,11 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         # ── 2. 戰鬥結果判定 ──
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
-            final_gold = int(random.randint(enemy["gold_range"], enemy["gold_range"]) * gold_mod)
+            
+            # 🔮 【List 解包完全修復】精準指定 [0] 與 [1] 的索引位置，徹底瓦解 TypeError 閃退！
+            gold_data = enemy["gold_range"]
+            final_gold = int(random.randint(int(gold_data[0]), int(gold_data[1])) * gold_mod)
+            
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
             p["enemy"] = None
