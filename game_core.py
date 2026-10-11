@@ -22,9 +22,21 @@ def process_game_logic(event, line_bot_api, configuration):
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的狀態面板", contents=player.get_status_card(p)))
         return
         
-    # 3. 處理【我的背包】倉庫判定
+    # 2. 處理【我的背包】倉庫判定 (維持原樣)
     elif user_msg == "我的背包" or user_msg == "背包":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的私人物品倉庫", contents=bag.get_bag_card(p)))
+        return
+
+    # ✨ 擴充：處理【我的裝備】皇家裝備欄查看面板
+    elif user_msg == "我的裝備" or user_msg == "裝備":
+        import forge_system
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的神聖裝備欄", contents=forge_system.get_equipment_card(p)))
+        return
+        
+    # ✨ 擴充：處理【脫下裝備】一鍵卸下並放回背包的動作
+    elif user_msg == "脫下裝備":
+        import forge_system
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
         return
         
     # 4. 處理【世界地圖】橫滑傳送廊判定
