@@ -3,6 +3,7 @@ import db_core
 import weapons
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
+# ⚒️ 20大區域史詩級隱藏神裝「合成配方大數據庫」
 FORGE_RECIPES = {
     "新手鐵短劍": {"cost_gold": 100, "materials": {"史萊姆黏液": 3, "破爛的匕首": 1}, "target": "新手鐵短劍"},
     "微光木藤弓": {"cost_gold": 500, "materials": {"強韌蜘蛛絲": 5, "古樹核心": 1}, "target": "微光木藤弓"},
@@ -43,7 +44,7 @@ def get_forge_menu(p):
     return {"flex": {"type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}, "quick_reply": QuickReply(items=quick_items)}
 
 def execute_forge_weapon(p, target_weapon):
-    """🔨 執行開爐合成判定 (回傳一體化 Dict 物件，全自動帶出橫移小按鈕)"""
+    """🔨 執行工坊合成判定"""
     target_weapon = target_weapon.replace("鍛造", "").replace("打造", "").replace(" ", "").strip()
     
     quick_items = [
@@ -54,11 +55,11 @@ def execute_forge_weapon(p, target_weapon):
     qr_object = QuickReply(items=quick_items)
     
     if target_weapon not in FORGE_RECIPES:
-        return {"text": f"❌ 遠古圖紙中沒有【{target_weapon}】的合成配方。", "is_flex": False, "quick_reply": qr_object}
+        return {"flex": db_core.make_battle_card(f"❌ 遠古圖紙中沒有【{target_weapon}】的合成配方。", p, None)["flex"], "quick_reply": qr_object}
         
     recipe = FORGE_RECIPES[target_weapon]
     if p["gold"] < recipe["cost_gold"]:
-        return {"text": f"❌ 🪙 資金不足！需要手續費 {recipe['cost_gold']} 金幣！", "is_flex": False, "quick_reply": qr_object}
+        return {"flex": db_core.make_battle_card(f"❌ 🪙 資金不足！需要手續費 {recipe['cost_gold']} 金幣！", p, None)["flex"], "quick_reply": qr_object}
         
     inv = p.get("inventory", {"items": {}, "materials": {}})
     if isinstance(inv, str): inv = json.loads(inv)
@@ -66,7 +67,7 @@ def execute_forge_weapon(p, target_weapon):
     
     for mat_name, req_count in recipe["materials"].items():
         if player_materials.get(mat_name, 0) < req_count:
-            return {"text": f"❌ 💎 素材短缺！需要【{mat_name}】x{req_count}！", "is_flex": False, "quick_reply": qr_object}
+            return {"flex": db_core.make_battle_card(f"❌ 💎 素材短缺！需要【{mat_name}】x{req_count}！", p, None)["flex"], "quick_reply": qr_object}
             
     p["gold"] -= recipe["cost_gold"]
     for mat_name, req_count in recipe["materials"].items():
@@ -84,7 +85,50 @@ def execute_forge_weapon(p, target_weapon):
     
     reply_text = f"🔨 🔥 ✨ 【遠古神兵 熔煉大成功】 ✨ 🔥 🔨\n恭喜你成功打造出了神裝 ── ⚔️【{recipe['target']}】！\n已全自動為你披掛上身！快點擊底部【我的裝備】查看新面板！"
     card = db_core.make_battle_card(reply_text, p, None)
-    return {"text": reply_text, "is_flex": True, "flex": card["flex"], "quick_reply": qr_object}
+    return {"flex": card["flex"], "quick_reply": qr_object}
+
+# ✨ 【Bug 完美對齊】將此函式名稱精準校正為 get_equipment_card，與 game_core.py 完美對接！
+def get_equipment_card(p):
+    """⚔️ 生成極高質感的純黑風格「勇者實體裝備欄面板」卡片"""
+    current_weapon = p.get("weapon", "赤手空拳")
+    w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
+    w_desc = weapons.SHOP_WEAPONS[current_weapon]["desc"] if current_weapon in weapons.SHOP_WEAPONS else "赤手空拳，毫無攻擊力加成。"
+    
+    contents = [
+        {"type": "text", "text": "🛡️ 勇者神聖裝備欄面板", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+        {"type": "separator", "margin": "sm", "color": "#333333"},
+        {"type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
+         "contents": [
+             {"type": "text", "text": "⚔️ 主手武器 (Main-Hand Weapon)", "size": "xs", "color": "#007AFF", "weight": "bold"},
+             {"type": "text", "text": f"【 {current_weapon} 】", "size": "md", "color": "#4CD964", "weight": "bold", "marginTop": "xs"},
+             {"type": "text", "text": f"💥 實體物理傷害增幅：+{w_bonus} 點", "size": "xs", "color": "#FF9500", "margin": "xs"},
+             {"type": "text", "text": f"📖 兵器神話：{w_desc}", "size": "xs", "color": "#8E8E93", "margin": "xs", "wrap": True}
+         ]}
+    ]
+    
+    quick_items = [
+        QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")),
+        QuickReplyItem(action=MessageAction(label="⚒️ 鍛造工坊", text="工坊")),
+        QuickReplyItem(action=MessageAction(label="🏃 返回世界尋怪", text="尋怪"))
+    ]
+    qr_object = QuickReply(items=quick_items)
+    
+    if current_weapon != "赤手空拳":
+        contents.append({
+            "type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "marginTop": "sm",
+            "action": {"type": "message", "label": f"❌ 卸下【{current_weapon}】放回背包", "text": "脫下裝備"}
+        })
+        
+    return {"flex": {"type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}, "quick_reply": qr_object}
+
+def execute_unequip_weapon(p):
+    """❌ 執行脫下裝備大腦"""
+    current_weapon = p.get("weapon", "赤手空拳")
+    if current_weapon == "赤手空拳": return "❌ 脫除失敗！你目前本來就赤手空拳。"
+    add_to_weapon_inventory(p, current_weapon)
+    p["weapon"] = "赤手空拳"
+    db_core.save_player(p)
+    return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器 ── ⚔️【{current_weapon}】安全解下！已完整存入您的武器背包欄！"
 
 def add_to_weapon_inventory(p, w_name):
     w_inv_str = p.get("weapon_inventory", "{}")
