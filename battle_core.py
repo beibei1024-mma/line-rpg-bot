@@ -1,5 +1,5 @@
 import random
-from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
+from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient, BroadcastRequest
 from linebot.models import TextSendMessage, FlexSendMessage
 
 import db_core
@@ -9,6 +9,7 @@ import bag
 import jobs
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
+    """【全功能神作版戰鬥大腦】實裝隨機爆裝系統與全服 Boss 首殺廣播推播"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -41,7 +42,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
     if "mp" not in p: p["mp"] = calculated_max_mp
 
-    w_bonus = weapons.SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in weapons.SHOP_WEAPONS else 0
+    # ⚔️ 企劃一：讀取新版 weapons.py 的實體武器加成，若不存在則保底為 0
+    current_weapon = p.get("weapon", "赤手空拳")
+    w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
 
     # A. 轉職處理
     if user_msg.startswith("轉職"):
@@ -64,9 +67,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         msg_payload = {
             "replyToken": event.reply_token,
             "messages": [{
-                "type": "flex", "altText": "轉職成功",
-                "contents": card_data["flex"],
-                "quickReply": card_data["quick_reply"]
+                "type": "flex", "altText": "轉職成功", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]
             }]
         }
         with ApiClient(configuration) as api_client:
@@ -80,7 +81,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔒 【天賦界限卡關中】請先完成手動天賦轉職！\n\n{job_notice}"))
             return
 
-    # B. 處理【加點 / 配點】指令判定
+    # B. 處理【加點 / 配點】指令
     if user_msg.startswith("加點") or user_msg.startswith("配點"):
         clean_msg = event.message.text.strip().replace("配點", "加點")
         raw_parts = clean_msg.split()
@@ -117,9 +118,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         msg_payload = {
             "replyToken": event.reply_token,
             "messages": [{
-                "type": "flex", "altText": "配點成功",
-                "contents": card_data["flex"],
-                "quickReply": card_data["quick_reply"]
+                "type": "flex", "altText": "配點成功", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]
             }]
         }
         with ApiClient(configuration) as api_client:
@@ -144,15 +143,13 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         msg_payload = {
             "replyToken": event.reply_token,
             "messages": [{
-                "type": "flex", "altText": "遭遇怪物",
-                "contents": card_data["flex"],
-                "quickReply": card_data["quick_reply"]
+                "type": "flex", "altText": "遭遇怪物", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]
             }]
         }
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
-    # 處理【技能書】呼叫與 D. 核心戰鬥扣血邏輯
+    # 處理【技能書】與 D. 核心戰鬥扣血、爆裝、全服推播大腦
     elif user_msg == "技能書":
         if p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 戰場外無法呼叫戰鬥技能書面板。"))
@@ -250,21 +247,45 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         # ── 2. 戰鬥結果判定 ──
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
-            
-            # 🔮 【List 解包完全修復】精準指定 [0] 與 [1] 的索引位置，徹底瓦解 TypeError 閃退！
             gold_data = enemy["gold_range"]
             final_gold = int(random.randint(int(gold_data[0]), int(gold_data[1])) * gold_mod)
             
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
-            p["enemy"] = None
             p["mp"] = min(calculated_max_mp, p.get("mp", calculated_max_mp) + 25)
             
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力值自然冥想恢復 +25 點。\n"
             
+            # 💎 企劃一：5% 驚喜爆裝機制！直接掉落與目前地圖匹配的專屬武器
+            if random.random() < 0.05:
+                current_loc = p.get("current_map", "新手村")
+                # 遍歷武器大庫，抽取名稱含有地圖關鍵字的武器
+                matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if current_loc[:2] in w_name or (current_loc == "新手村" and "新手" in w_name)]
+                if matched_weapons:
+                    drop_w = random.choice(matched_weapons)
+                    p["weapon"] = drop_w
+                    log += f"💎 🔥 🗺️ 【神裝降臨】！你驚喜搜刮到了該區域的專屬神兵：⚔️【{drop_w}】！已自動裝備，傷害大幅狂飆！\n"
+
+            # 📢 企劃三：全服首殺推播廣播機制！當擊敗克蘇魯或巨龍時，向全服 LINE 發送捷報
+            raw_monster_name = enemy["name"]
+            if "地獄紅蓮巨龍" in raw_monster_name or "邪神克蘇魯" in raw_monster_name:
+                try:
+                    broadcast_payload = {
+                        "messages": [{
+                            "type": "text",
+                            "text": f"📢 🔥 【全服史詩首殺公告】 🔥 📢\n─────────────────\n震撼！偉大的勇者在剛才成功絕殺了世界級 Boss 👑【{raw_monster_name}】！\n神話已在聊天室誕生，名留青史！"
+                        }]
+                    }
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).broadcast(BroadcastRequest.from_dict(broadcast_payload))
+                    log += f"\n👑 🏆 諸神見證！你完成了解殺世界 Boss 的壯舉，首殺捷報已推播給全服所有玩家！"
+                except Exception:
+                    pass
+
+            p["enemy"] = None
             if random.random() < 0.50 and enemy.get("drop_item"):
                 bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
-                log += f"💎 【幸運掉寶】！搜刮到了素材：【{enemy['drop_item']}】x1！\n"
+                log += f"💎 【幸運掉寶】！素材：【{enemy['drop_item']}】x1！\n"
                 
             while p["exp"] >= p["level"] * 50:
                 p["exp"] -= p["level"] * 50
@@ -281,9 +302,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             msg_payload = {
                 "replyToken": event.reply_token,
                 "messages": [{
-                    "type": "flex", "altText": "戰鬥結束",
-                    "contents": card_data["flex"],
-                    "quickReply": card_data["quick_reply"]
+                    "type": "flex", "altText": "戰鬥結束", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]
                 }]
             }
             with ApiClient(configuration) as api_client:
@@ -319,9 +338,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             msg_payload = {
                 "replyToken": event.reply_token,
                 "messages": [{
-                    "type": "flex", "altText": "戰鬥回合",
-                    "contents": card_data["flex"],
-                    "quickReply": card_data["quick_reply"]
+                    "type": "flex", "altText": "戰鬥回合", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]
                 }]
             }
             with ApiClient(configuration) as api_client:
