@@ -1,3 +1,57 @@
+import os
+import json
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# 🚀 本地快取記憶體暫存區：普通互毆扣血只在本地計算，打死怪才同步回雲端，大幅提升回傳速度
+MEMORY_PLAYERS = {}
+
+def get_db_connection():
+    db_url = os.environ.get('DATABASE_URL')
+    return psycopg2.connect(db_url)
+
+def load_player(user_id):
+    if user_id in MEMORY_PLAYERS:
+        return MEMORY_PLAYERS[user_id]
+        
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
+    player = cur.fetchone()
+    
+    if not player:
+        cur.execute(
+            "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0)",
+            (user_id,)
+        )
+        conn.commit()
+        cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
+        player = cur.fetchone()
+        
+    cur.close()
+    conn.close()
+    
+    if player and player['enemy']: 
+        player['enemy'] = json.loads(player['enemy'])
+        
+    MEMORY_PLAYERS[user_id] = dict(player)
+    return MEMORY_PLAYERS[user_id]
+
+def save_player(p):
+    MEMORY_PLAYERS[p['user_id']] = p
+    conn = get_db_connection()
+    cur = conn.cursor()
+    enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
+    
+    cur.execute(
+        "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s WHERE user_id=%s",
+        (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
+         p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p['user_id'])
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
 def make_battle_card(title, p, enemy):
     """【視覺化按鈕圖卡升級版】動態生成附帶行動按鈕的 Flex Message 卡片"""
     import jobs
