@@ -251,25 +251,29 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
             gold_data = enemy["gold_range"]
-            final_gold = int(random.randint(int(gold_data), int(gold_data)) * gold_mod)
+            final_gold = int(random.randint(int(gold_data[0]), int(gold_data[1])) * gold_mod)
             
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
             
-            # ✨ 【Bug 完美防守點】使用確切的安全值判定，徹底消滅 NoneType + 25 崩潰
+            # ✨ 安全防護：使用確切的安全值判定，徹底消滅 NoneType + 25 崩潰
             safe_current_mp = p.get("mp") if p.get("mp") is not None else calculated_max_mp
             p["mp"] = min(calculated_max_mp, safe_current_mp + 25)
             
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力值自然冥想恢復 +25 點。\n"
             
-            # 5% 驚喜爆裝機制
+            # 5% 驚喜爆裝機制 (全自動與舊武器替換放回背包連動)
             if random.random() < 0.05:
                 current_loc = p.get("current_map", "新手村")
                 matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if current_loc[:2] in w_name or (current_loc == "新手村" and "新手" in w_name)]
                 if matched_weapons:
                     drop_w = random.choice(matched_weapons)
+                    old_w = p.get("weapon", "赤手空拳")
+                    if old_w != "赤手空拳":
+                        import forge_system
+                        forge_system.add_to_weapon_inventory(p, old_w)
                     p["weapon"] = drop_w
-                    log += f"💎 🔥 🗺️ 【神裝降臨】！你驚喜搜刮到了該區域的專屬神兵：⚔️【{drop_w}】！已自動裝備，傷害大幅狂飆！\n"
+                    log += f"💎 🔥 🗺️ 【神裝降臨】！你驚喜搜刮到了該區域的專屬神兵：⚔️【{drop_w}】！已自動裝備並存檔！\n"
 
             # 全服首殺公告推播
             raw_monster_name = enemy["name"]
@@ -318,7 +322,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             if "暴雨滂沱" in env_str: vit_val = int(vit_val * 0.8)
             if "魔能潮汐" in env_str and skill_name == "火球術": log += "🌀 【環境魔能湧動】！火球術威力額外暴衝！\n"
             if "精神污染" in enemy.get("skill", ""):
-                # ✨ 安全保護點
                 safe_current_mp = p.get("mp") if p.get("mp") is not None else calculated_max_mp
                 p["mp"] = max(0, safe_current_mp - 20)
                 log += f"\n👁️ 🚨 邪神被動【精神污染】！魔力值被吸走 20 點！"
@@ -329,11 +332,10 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 
             p_def = vit_val // 2
             dmg_received = max(1, final_m_atk - p_def)
-            p["hp"] -= dmg_received
+            p["hp"] = max(0, p["hp"] - dmg_received)
             log += f"\n🩹 【{enemy['name']}】發動反擊！你受到 {dmg_received} 點物理傷害！"
             
             if p["hp"] <= 0:
-                p["hp"] = 0
                 p["enemy"] = None
                 log += "\n💀 你受傷過重陣亡了！請點擊底部【😇 祈求復活】小圖卡。"
                 db_core.save_player(p)
@@ -345,13 +347,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             msg_payload = {
                 "replyToken": event.reply_token,
                 "messages": [{
-                    "type": "flex", "altText": "戰鬥回合",
-                    "contents": card_data["flex"],
-                    "quickReply": card_data["quick_reply"]
+                    "type": "flex", "altText": "戰鬥回合", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]
                 }]
             }
-            with ApiClient(configuration) as api_client:
-                            # ── 3. 萬能字典非同步封裝回傳 ──
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
                 
@@ -361,13 +359,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         msg_payload = {
             "replyToken": event.reply_token,
             "messages": [{
-                "type": "flex", 
-                "altText": "冒險導引",
-                "contents": card_data["flex"],
-                "quickReply": card_data["quick_reply"]
+                "type": "flex", "altText": "冒險導引", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]
             }]
         }
-        # ✨ 【縮排完美修復】確保 with 內部的這兩行代碼向內縮排四個空格，徹底封印 IndentationError！
         with ApiClient(configuration) as api_client:
             messaging_api = MessagingApi(api_client)
             messaging_api.reply_message(ReplyMessageRequest.from_dict(msg_payload))
