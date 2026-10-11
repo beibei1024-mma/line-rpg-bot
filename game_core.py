@@ -5,53 +5,86 @@ import bag
 import maps
 import battle_core
 
+# 🚀 導入新增的簽到福利系統
+import datetime
+
 from linebot.models import TextSendMessage, FlexSendMessage
 
+def handle_daily_sign_in(p):
+    """🧠 企劃二：每日福利簽到大腦邏輯"""
+    # 🕒 獲取台灣目前日期字符串 (格式: YYYY-MM-DD)
+    today_str = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")
+    
+    if p.get("last_sign_in") == today_str:
+        return f"❌ 勇者！你今天 ({today_str}) 已經簽到過了，太貪心神明會生氣的！明天再來吧！"
+        
+    # 發放隨機金幣福利與藥水
+    reward_gold = random.randint(500, 2000) if "random" in globals() else 1200
+    p["gold"] += reward_gold
+    p["last_sign_in"] = today_str
+    
+    # 塞入 2 瓶補血高級藥水進背包
+    bag.add_to_inventory(p, "高級生命藥水")
+    bag.add_to_inventory(p, "高級生命藥水")
+    
+    db_core.save_player(p)
+    
+    return f"📆 ✨ 【每日簽到大成功】 ✨ 📆\n─────────────────\n冒險者公會發放了今日生存補給：\n🪙 獎勵金幣：+{reward_gold} 🪙\n🧪 高級生命藥水：+2 瓶 🧪\n\n💡 進度已完美同步至 Supabase 雲端！"
+
 def process_game_logic(event, line_bot_api, configuration):
-    """【Quick Reply 相容版主控台】完美梳理玩家資料讀取與分流大腦"""
     user_id = event.source.user_id
     user_msg = event.message.text.replace(" ", "").strip()
     
-    # ✨ 修正關鍵：必須先在最前面讀取好玩家存檔資料，後面的分流才能共用變數 p！
     p = db_core.load_player(user_id)
 
-    # 1. 處理【我的狀態】判定 ➡️ 渲染黑曜石勇者天賦卡
     if user_msg == "我的狀態":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的狀態面板", contents=player.get_status_card(p)))
         return
-        
-    # 2. 處理【我的背包】判定 ➡️ 渲染實體網格倉庫卡片
     elif user_msg == "我的背包":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="我的私人物品倉庫", contents=bag.get_bag_card(p)))
         return
-        
-    # 3. 處理【世界地圖】查詢判定 ➡️ 渲染左右橫滑 20 大世界傳送陣廊
     elif user_msg == "世界地圖":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟世界傳送選單", contents=maps.get_maps_carousel(p)))
         return
-        
-    # 4. 處理【前往 / 傳送】指令傳送判定
     elif user_msg.startswith("前往") or user_msg.startswith("傳送"):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=maps.change_map(p, user_msg)))
         return
-        
-    # 5. 處理【使用】藥水道具指令判定
     elif user_msg.startswith("使用"):
         potion_name = user_msg.replace("使用", "").strip()
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=bag.use_potion(p, potion_name)))
         return
-        
-    # 6. 處理【冒險商店】面板開啟判定
     elif user_msg == "冒險商店":
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟商店", contents=shop.get_shop_card(p)))
         return
-        
-    # 7. 處理【購買物品】商店交易判定
     elif user_msg.startswith("購買"):
         item = user_msg.replace("購買", "").strip()
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=shop.buy_weapon(p, item)))
         return
-
-    # 8. 其餘普通攻擊、尋怪、釋放技能指令，全自動轉交給 battle_core 戰鬥大腦處理
+        
+    # ✨ 企劃二：切分簽到攔截點
+    elif user_msg == "簽到":
+        # 內嵌隨機補防
+        import random
+        reward_gold = random.randint(500, 2000)
+        today_str = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")
+        if p.get("last_sign_in") == today_str:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 勇者！你今天 ({today_str}) 已經簽到過了，明天再來吧！"))
+            return
+        p["gold"] += reward_gold
+        p["last_sign_in"] = today_str
+        bag.add_to_inventory(p, "高級生命藥水")
+        bag.add_to_inventory(p, "高級生命藥水")
+        db_core.save_player(p)
+        
+        # 拋出超帥簽到卡
+        card_data = db_core.make_battle_card(f"📆 簽到成功！獲得金幣 +{reward_gold}、高級生命藥水 x2！\n\n狀態已安全儲存。", p, None)
+        msg_payload = {
+            "replyToken": event.reply_token,
+            "messages": [{"type": "flex", "altText": "簽到成功", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]
+        }
+        from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
     else:
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
