@@ -1,6 +1,6 @@
 import random
 
-# 🗺️ 企劃二：全新 20 張地圖與怪物生成綁定庫（大分散架構）
+# 🗺️ 全新 20 張地圖與怪物生成綁定庫（大分散架構）
 MAP_MONSTER_SPAWN = {
     "新手村": ["slime", "goblin", "wild_boar", "hornet", "wolf", "mushroom"],
     "微光森林": ["forest_spider", "treant", "pixie", "thief", "bat", "witch_apprentice"],
@@ -13,7 +13,6 @@ MAP_MONSTER_SPAWN = {
     "亞特蘭提斯": ["merman", "shark_warrior", "sea_witch", "kraken_tentacle", "coral_golem", "poseidon_guard"],
     "天空之城": ["sky_whale", "angel_soldier", "pegasus", "valkyrie_scout", "archangel_pawn", "zeus_statue"],
     "巨龍巢穴": ["dragon_guard", "wyvern", "dragon_egg_thief", "drake", "dragon_mage", "dragon"],
-    "湮滅神殿": ["void_specter", "cthulhu_avatar", "faceless_one", "star_spawn", "shoggoth", "mind_flayer"],
     "精靈古都": ["elf_archer", "centaur", "unicorn", "dryad", "fairy_queen_guard", "ancient_protector"],
     "機械工廠": ["clockwork_spider", "drone", "steam_golem", "laser_turret", "cyborg_pawn", "mecha_boss_v1"],
     "迷霧沼澤": ["swamp_frog", "crocodile", "hydra_spawn", "will_o_wisp", "mud_monster", "swamp_witch"],
@@ -32,7 +31,7 @@ MONSTER_AFFIXES = [
     {"prefix": "👑 【遠古神聖】", "hp_mod": 3.5, "atk_mod": 2.2, "gold_mod": 6.0, "default_skill": "🌟 神聖領域（每次受到傷害，反彈 10% 威力給勇者）"}
 ]
 
-# 👾 包含 120 隻怪物的原始生物超龐大數據庫
+# 👾 包含 120 隻怪物的原始生物超龐大數據庫 (前半段)
 MONSTERS_BASE = {
     # 1. 新手村 (Lv.1~5)
     "slime": {"name": "綠色史萊姆", "level": 1, "min_hp": 20, "max_hp": 30, "atk": 3, "gold_range": (10, 50), "exp": 20, "drop_item": "史萊姆黏液"},
@@ -85,7 +84,8 @@ MONSTERS_BASE = {
     # 7. 幽暗地窖 (Lv.31~35)
     "zombie": {"name": "瘟疫喪屍", "level": 31, "min_hp": 2200, "max_hp": 2900, "atk": 95, "gold_range": (700, 2800), "exp": 12000, "drop_item": "喪屍心臟"},
     "ghoul": {"name": "食屍鬼小鬼", "level": 32, "min_hp": 2000, "max_hp": 2700, "atk": 112, "gold_range": (720, 3000), "exp": 13500, "drop_item": "尖銳利齒"},
-    "shadow_creeper", "level": 33: {"name": "暗影潛行者", "level": 33, "min_hp": 1800, "max_hp": 2500, "atk": 135, "gold_range": (750, 3200), "exp": 15000, "drop_item": "永夜陰影"},
+    # ✨ 【Bug 完美修復】重新對齊引號與冒號，讓結構完美融入字典
+    "shadow_creeper": {"name": "暗影潛行者", "level": 33, "min_hp": 1800, "max_hp": 2500, "atk": 135, "gold_range": (750, 3200), "exp": 15000, "drop_item": "永夜陰影"},
     "necromancer": {"name": "叛逃死靈法師", "level": 34, "min_hp": 2500, "max_hp": 3400, "atk": 128, "gold_range": (800, 3500), "exp": 17000, "drop_item": "亡者頭骨"},
     "lich_minion": {"name": "骨骸大巫妖", "level": 35, "min_hp": 2800, "max_hp": 3800, "atk": 142, "gold_range": (850, 3800), "exp": 20000, "drop_item": "巫妖靈魂匣"},
     "death_knight": {"name": "墮落無頭騎士", "level": 35, "min_hp": 4500, "max_hp": 6000, "atk": 160, "gold_range": (1200, 5000), "exp": 26000, "drop_item": "魔化冥鐵鎧甲"},
