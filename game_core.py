@@ -88,3 +88,69 @@ def process_game_logic(event, line_bot_api, configuration):
         return
     else:
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
+    # 6. 處理【冒險商店】面板開啟判定
+    elif user_msg == "冒險商店":
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟商店", contents=shop.get_shop_card(p)))
+        return
+        
+    # 7. 處理【購買物品】商店交易判定
+    elif user_msg.startswith("購買"):
+        item = user_msg.replace("購買", "").strip()
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=shop.buy_weapon(p, item)))
+        return
+        
+    # 8. 處理【簽到】每日福利領取判定
+    elif user_msg == "簽到":
+        import random
+        import datetime
+        reward_gold = random.randint(500, 2000)
+        today_str = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")
+        if p.get("last_sign_in") == today_str:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 勇者！你今天 ({today_str}) 已經簽到過了，明天再來吧！"))
+            return
+        p["gold"] += reward_gold
+        p["last_sign_in"] = today_str
+        bag.add_to_inventory(p, "高級生命藥水")
+        bag.add_to_inventory(p, "高級生命藥水")
+        db_core.save_player(p)
+        
+        card_data = db_core.make_battle_card(f"📆 簽到成功！獲得金幣 +{reward_gold}、高級生命藥水 x2！", p, None)
+        msg_payload = {
+            "replyToken": event.reply_token,
+            "messages": [{"type": "flex", "altText": "簽到成功", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]
+        }
+        from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
+
+    # ✨ 企劃一：處理【冒險挑戰】皇家試煉入口與多人 Boss 攔截點 (導入全新獨立頁面)
+    elif user_msg == "冒險挑戰" or user_msg == "挑戰":
+        import challenge_system
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="皇家試煉選單", contents=challenge_system.get_challenge_menu(p)))
+        return
+        
+    elif user_msg == "挑戰爬塔":
+        import challenge_system
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=challenge_system.execute_tower_climb(p)))
+        return
+        
+    elif user_msg == "挑戰世界Boss" or user_msg == "世界Boss":
+        import challenge_system
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=challenge_system.execute_world_boss_raid(p)))
+        return
+
+    # ✨ 企劃二：處理【鍛造 / 工坊】禁忌物料熔煉與手工神裝合成攔截點 (導入全新獨立頁面)
+    elif user_msg == "鍛造工坊" or user_msg == "鍛造" or user_msg == "工坊":
+        import forge_system
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="遠古鍛造工坊", contents=forge_system.get_forge_menu(p)))
+        return
+        
+    elif user_msg.startswith("鍛造"):
+        import forge_system
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_forge_weapon(p, user_msg)))
+        return
+
+    # 9. 其餘所有普通攻擊、尋怪、施放法術口令，全自動安全移交戰鬥大腦處理 (維持原樣，絕無干擾)
+    else:
+        battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
