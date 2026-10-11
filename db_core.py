@@ -3,7 +3,7 @@ import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# 🚀 LINE v3 SDK 必備的快速回應物件元件導入
+# 🚀 LINE v3 SDK 必備的快速回應物件元件
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
 MEMORY_PLAYERS = {}
@@ -49,13 +49,13 @@ def save_player(p):
     conn.close()
 
 def make_battle_card(title, p, enemy):
-    """【Quick Reply 小圖標智慧版】生成無按鈕乾淨卡片，並將所有行動化為底部滑動小圖標"""
+    """【Quick Reply 智慧完全體】生成完美過審的黑曜石血條卡片"""
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
     
-    # 計算血量與魔力
+    # 計算血量與魔力上限
     vit_val = int(p.get("vitality", 10 + (level * 3)) * job_mod["vit_mod"])
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
@@ -68,7 +68,15 @@ def make_battle_card(title, p, enemy):
     def get_bar(pct, color): 
         return {
             "type": "box", "layout": "vertical", "backgroundColor": "#2A2A2A", "height": "10px", "cornerRadius": "5px", "margin": "xs", 
-            "contents": [{"type": "box", "layout": "vertical", "backgroundColor": color, "width": f"{pct}%", "height": "10px", "cornerRadius": "5px"}]
+            "contents": [{
+                "type": "box", 
+                "layout": "vertical", 
+                "backgroundColor": color, 
+                "width": f"{pct}%", 
+                "height": "10px", 
+                "cornerRadius": "5px",
+                "contents": [] # 🌟 【Bug 核心修復】補上這個空列表，解決新版 v3 SDK Pydantic 嚴格驗證閃退問題！
+            }]
         }
                 
     contents = []
@@ -77,8 +85,8 @@ def make_battle_card(title, p, enemy):
     if "擊敗對手" in title: header_title = "🏆 戰鬥大獲全勝 🏆"
     elif "突破成功" in title: header_title = "✨ 天賦覺醒突破 ✨"
     elif "配點成功" in title: header_title = "💪 屬性天賦加點 💪"
-    elif p["hp"] <= 0: header_title = "☠️ 勇者不幸陣亡 ☠️"
-    else: header_title = "⚔️ 戰場即時動態 ⚔️"
+    elif p["hp"] <= 0: header_title = "☠ "
+    else: header_title = "⚔ 戰場即時動態 ⚔"
         
     contents.append({"type": "text", "text": header_title, "weight": "bold", "size": "md", "align": "center", "color": "#FFFFFF"})
     contents.append({"type": "separator", "margin": "md"})
@@ -109,34 +117,29 @@ def make_battle_card(title, p, enemy):
         get_bar(mp_pct, "#34AADC")
     ])
     
-    # 🌟 核心改動：卡片本身保持乾淨無按鈕，純黑底高質感
     flex_bubble = {
         "type": "bubble",
         "styles": {"body": {"backgroundColor": "#1C1C1E"}},
-        "body": {"type": "box", "layout": "vertical", "contents": contents}
+        "body": {
+            "type": "box", 
+            "layout": "vertical", 
+            "contents": contents
+        }
     }
     
-    # 🕹️ 動態生成手機底部 QuickReply 小按鈕清單（像您圖中圈起來的橫排樣式）
     quick_items = []
-    
     if p["hp"] <= 0:
-        # 💀 狀況 1：勇者陣亡
         quick_items.append(QuickReplyItem(action=MessageAction(label="😇 祈求復活", text="復活")))
     elif enemy:
-        # ⚔️ 狀況 2：戰鬥中（出現戰鬥快捷按鈕，不相干的自動藏起來，非常乾淨）
-        quick_items.append(QuickReplyItem(action=MessageAction(label="🗡️ 攻擊", text="攻擊")))
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🗡 攻擊", text="攻擊")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🔮 技能書", text="技能書")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🏃 逃跑", text="逃跑")))
     else:
-        # 🌲 狀況 3：非戰鬥狀態中（冒險大清單，可以無限橫向滑動）
         quick_items.append(QuickReplyItem(action=MessageAction(label="🔍 尋找怪物", text="尋怪")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="👤 我的狀態", text="我的狀態")))
-        quick_items.append(QuickReplyItem(action=MessageAction(label="🗺️ 世界地圖", text="世界地圖")))
+        quick_items.append(QuickReplyItem(action=MessageAction(label="🗺 世界地圖", text="世界地圖")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🏪 冒險商店", text="冒險商店")))
 
-    # 包裝成 SDK 物件
     quick_reply_object = QuickReply(items=quick_items)
-    
-    # 回傳最終的卡片 JSON 與「小圖標快速回應物件」
     return {"flex": flex_bubble, "quick_reply": quick_reply_object}
