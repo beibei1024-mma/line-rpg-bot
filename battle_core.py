@@ -25,7 +25,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
     agi_val = int(base_agi * job_mod["agi_mod"])
     int_val = int(base_int * job_mod["int_mod"])
     vit_val = int(base_vit * job_mod["vit_mod"])
-    # ✨ 【Bug 完美修復】將原本錯誤的 luck_mod 修正對齊為 jobs.py 內正牌的 luk_mod
     luk_val = int(base_luk * job_mod["luk_mod"])
     men_val = int(base_men * job_mod["men_mod"])
     
@@ -142,7 +141,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg):
         line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟技能書", contents=flex_menu))
         return
     # D. 處理【攻擊】與【使用技能】核心戰鬥扣血邏輯
-    elif user_msg "攻擊" or user_msg.startswith("使用技能"):
+    # ✨ 【SyntaxError 語法完美修復】補上漏掉的 in 關鍵字，確保能順利過載編譯！
+    elif user_msg == "攻擊" or user_msg.startswith("使用技能"):
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法發動攻擊（可能已陣亡或周圍沒有怪物）。"))
             return
