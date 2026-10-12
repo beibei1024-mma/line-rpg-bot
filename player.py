@@ -1,11 +1,11 @@
-# player.py - 勇者皇家私人物資與狀態控制中心 (防截斷防None完全體)
+# player.py - 勇者皇家私人物資與狀態控制中心 (指定屬性排序完全體)
 
 import db_core
 import jobs
 import json
 
 def get_status_card(p):
-    """👤 生成 100% 不外流、防資料庫 None 值、硬核戰力四維狀態面板"""
+    """👤 生成 100% 不白漏、不外流、硬核戰力四維狀態面板"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -26,7 +26,7 @@ def get_status_card(p):
     luk_val = int(b_luk * job_mod["luk_mod"])
     men_val = int(b_men * job_mod["men_mod"])
 
-    # 2. 累加多部位已穿戴裝備的隨機副詞綴 (連通實體後台加算)
+    # 2. 累加多部位已穿戴裝備的隨機副詞綴
     eq_slots_str = p.get("equipped_slots", "{}")
     try: equipped = json.loads(eq_slots_str)
     except: equipped = {}
@@ -50,12 +50,10 @@ def get_status_card(p):
 
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
-    current_weapon = p.get("weapon", "赤手空拳")
 
-    # ✨【💥 魔力 None 核心修復防爆牆】如果抓到後台是 None，在前端強制校正回復最大值，防戰鬥扣減崩潰
     if p.get("mp") is None or p["mp"] == "None" or str(p["mp"]).strip() == "":
         p["mp"] = calculated_max_mp
-        db_core.save_player(p) # 順便將正確的數字洗回 Supabase/PostgreSQL
+        db_core.save_player(p)
 
     contents = [
         {"type": "text", "text": f"👤 勇者：[ {p['user_id'][:8]} ]", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
@@ -82,20 +80,19 @@ def get_status_card(p):
         
         {"type": "separator", "margin": "md", "color": "#333333"},
         
-        # ✨【💥 基礎屬性防截斷核心修正】拆分為獨立橫向二元 Box 網格，騰出 2 倍像素空間，徹底斬斷 ... 
-        {"type": "text", "text": f"💪 【 遠古天賦屬性 】(剩餘潛能: {p.get('attribute_points', 0)} 點)", "weight": "bold", "size": "xs", "color": "#FFCC00"},
-        {"type": "box", "layout": "horizontal", "margin": "sm", "contents": [
+        # ✨【💥 完美連通您的全新指定屬性排序】高密度三元素橫向安全 Box
+        {"type": "text", "text": "💪 【 六大遠古天賦屬性 】", "weight": "bold", "size": "xs", "color": "#FFCC00"},
+        {"type": "box", "layout": "horizontal", "margin": "sm", "spacing": "xs", "contents": [
             {"type": "text", "text": f"🔸力量: {str_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
-            {"type": "text", "text": f"🔸敏捷: {agi_val}", "size": "xs", "color": "#E0E0E0", "flex": 1}
-        ]},
-        {"type": "box", "layout": "horizontal", "margin": "xs", "contents": [
-            {"type": "text", "text": f"🔸智力: {int_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
+            {"type": "text", "text": f"🔸敏捷: {agi_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
             {"type": "text", "text": f"🔸體力: {vit_val}", "size": "xs", "color": "#E0E0E0", "flex": 1}
         ]},
-        {"type": "box", "layout": "horizontal", "margin": "xs", "contents": [
+        {"type": "box", "layout": "horizontal", "margin": "xs", "spacing": "xs", "contents": [
             {"type": "text", "text": f"🔸幸運: {luk_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
+            {"type": "text", "text": f"🔸智力: {int_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
             {"type": "text", "text": f"🔸精神: {men_val}", "size": "xs", "color": "#E0E0E0", "flex": 1}
-        ]}
+        ]},
+        {"type": "text", "text": f"💡 (剩餘潛能點數：{p.get('attribute_points', 0)} 點)", "size": "xs", "color": "#FFCC00", "margin": "sm", "weight": "bold"}
     ]
 
     flex_bubble = {
