@@ -1,27 +1,28 @@
+# shop.py - 皇家一般常駐物資補給商店 v4.5
+
 import json
 import db_core
-import weapons
 import bag
-import forge_system
+import equipment_core
+import player_equipment
 
-# 🏪 冒險商店：上架販售的商品數據庫（金幣計價）
-# ✨ 【文字原樣保留】完全不更動您的武器說明與素質文案，方便您自己修改測試！
+# 🏪 冒險商店：上架販售的常駐商品數據庫（金幣計價，完全保留您的文字文案與說明）
 SHOP_ITEMS = {
-    # 🧪 【消耗品區】：買完會進到玩家背包 items 裡面
+    # 🧪 【消耗品區】
     "初級生命藥水": {"type": "potion", "price": 30, "desc": "隨機恢復 30~50 點生命值。"},
     "高級生命藥水": {"type": "potion", "price": 100, "desc": "隨機恢復 80~120 點生命值。"},
     
-    # ⚔️ 【基礎武器區】：買完後會安全送入背包中的裝備與兵器收藏庫
-    "新手鐵短劍": {"type": "weapon", "price": 150, "desc": "物傷 +15。适合剛出村的新手勇者。"},
-    "微光木藤弓": {"type": "weapon", "price": 800, "desc": "物傷 +45。森林老獵人常用的木弓。"},
-    "凜冬不融碎冰刺": {"type": "weapon", "price": 2500, "desc": "物傷 +95。散發著淡淡寒氣的冰刺。"},
-    "黑曜熔岩大劍": {"type": "weapon", "price": 6000, "desc": "物傷 +160。黑曜石打造，揮砍帶有熱浪。"}
+    # ⚔️ 【基礎武器區】（連通多部位基本底層白字對照）
+    "新手鐵短劍": {"type": "weapon", "slot": "武器", "base": "鐵劍", "price": 150, "desc": "物傷 +15。适合剛出村的新手勇者。"},
+    "微光木藤弓": {"type": "weapon", "slot": "武器", "base": "長弓", "price": 800, "desc": "物傷 +45。森林老獵人常用的木弓。"},
+    "凜冬不融碎冰刺": {"type": "weapon", "slot": "武器", "base": "法杖", "price": 2500, "desc": "物傷 +95。散發著淡淡寒氣的冰刺。"},
+    "黑曜熔岩大劍": {"type": "weapon", "slot": "武器", "base": "鐵劍", "price": 6000, "desc": "物傷 +160。黑曜石打造，揮砍帶有熱浪。"}
 }
 
 def get_shop_card(p):
     """🎨 生成極具質感的黑曜石風格「視覺化商店按鈕圖卡」"""
     contents = [
-        {"type": "text", "text": "🏪 冒險者公會・皇家補給商店", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+        {"type": "text", "text": "🏪 冒險者公會・皇家常駐補給商店", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
         {"type": "text", "text": f"🪙 您目前的流動資金：🪙 {p['gold']} 金幣", "size": "xs", "color": "#FFCC00", "align": "center"},
         {"type": "separator", "margin": "sm", "color": "#333333"}
     ]
@@ -36,7 +37,7 @@ def get_shop_card(p):
                     {"type": "text", "text": f"🔹 {name} (🪙 {info['price']} 金幣)", "size": "xs", "color": "#E0E0E0", "weight": "bold"},
                     {"type": "text", "text": f"   ↳ {info['desc']}", "size": "xs", "color": "#8E8E93", "margin": "xs"},
                     {"type": "button", "style": "primary", "color": "#34AADC", "height": "sm", "marginTop": "xs",
-                     "action": {"type": "message", "label": f"🛒 購買 {name}", "text": f"購買 {name}"}}
+                     "action": {"type": "message", "label": f"🛒 購買 {name}", "text": f"商店購買 {name}"}} # ✨【分流點】改為商店購買，避免與黑市指令打架
                 ]
             })
 
@@ -50,7 +51,7 @@ def get_shop_card(p):
                     {"type": "text", "text": f"🗡️ {name} (🪙 {info['price']} 金幣)", "size": "xs", "color": "#E0E0E0", "weight": "bold"},
                     {"type": "text", "text": f"   ↳ {info['desc']}", "size": "xs", "color": "#8E8E93", "margin": "xs"},
                     {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "marginTop": "xs",
-                     "action": {"type": "message", "label": f"🛒 購買 {name}", "text": f"購買 {name}"}}
+                     "action": {"type": "message", "label": f"🛒 購買 {name}", "text": f"商店購買 {name}"}} # ✨【分流點】改為商店購買
                 ]
             })
 
@@ -63,11 +64,11 @@ def get_shop_card(p):
     }
 
 def buy_weapon(p, item_name):
-    """🛒 商店大腦：買到實體武器 100% 入庫武器備用背包收藏庫，拒絕直接穿戴覆蓋"""
-    item_name = item_name.replace("購買", "").replace("下單", "").replace(" ", "").strip()
+    """🛒 一般商店標準採購判定大腦：買完後會安全送入多部位裝備備用背包，拒絕直接覆蓋"""
+    item_name = item_name.replace("商店購買", "").replace("購買", "").replace("下單", "").replace(" ", "").strip()
     
     if item_name not in SHOP_ITEMS:
-        return f"❌ 交易失敗！冒險商店目前沒有販售【{item_name}】這件商品。"
+        return f"❌ 交易失敗！一般常駐商店目前沒有販售【{item_name}】這件商品。"
         
     config = SHOP_ITEMS[item_name]
     
@@ -82,10 +83,14 @@ def buy_weapon(p, item_name):
     if config["type"] == "potion":
         bag.add_to_inventory(p, item_name, is_material=False)
         db_core.save_player(p)
-        return f"🛒 🧪 【交易成功】 🧪 🛒\n─────────────────\n你支付了 {config['price']} 金幣，成功購買了【{item_name}】x1！\n📦 物資已為您送入【我的背包】倉庫，輸入【使用 {item_name}】即可喝藥補血！\n\n🪙 剩餘資金：🪙 {p['gold']} 金幣"
+        return f"🛒 🧪 【交易成功】 🧪 🛒\n─────────────────\n你支付了 {config['price']} 金幣，成功購買了【{item_name}】x1！\n📦 物資已為您送入【我的背包】物資倉庫，輸入【使用 {item_name}】即可補血調息！\n\n🪙 剩餘資金：🪙 {p['gold']} 金幣"
         
     elif config["type"] == "weapon":
-        # ✨ 【背包數據流合流】直接呼叫工坊核心組件，將新買的現貨武器精準送入備用武器庫！
-        forge_system.add_to_weapon_inventory(p, item_name)
+        # ✨ 【多部位合流機制】生成一件制式普通的白字實體裝備
+        eq = equipment_core.generate_random_equipment(config["slot"], config["base"], forced_rarity="⭐普通")
+        eq["name"] = f"⭐【普通】{item_name}" # 完美契合您原有的名稱文案
+        
+        # 安全灌入新版多部位備用包
+        player_equipment._add_to_equipment_inventory(p, eq)
         db_core.save_player(p)
-        return f"🛒 ⚔️ 【 兵器交易成功 】 🛒 ⚔️\n─────────────────\n你支付了 {config['price']} 金幣，成功購買了現貨基礎兵器 ── ⚔️【{item_name}】！\n\n📦 存放去向：新兵器已妥善存入您的【 我的背包 -> 裝備與兵器收藏庫 】中！\n💡 操作提示：點擊小圖標開啟【我的背包】，即可隨時手動輸入【裝備 {item_name}】進行更換！\n\n🪙 剩餘資金：🪙 {p['gold']} 金幣"
+        return f"🛒 ⚔️ 【 兵器交易成功 】 🛒 ⚔️\n─────────────────\n你支付了 {config['price']} 金幣，成功購買了常駐現貨兵器 ── ⚔️【{item_name}】！\n\n📦 存放去向：新武裝已送入您的【 裝備背包 】中！\n💡 操作提示：請手動輸入【裝備包】或【裝備背包】，即可一鍵點擊穿戴上身！\n\n🪙 剩餘資金：🪙 {p['gold']} 金幣"
