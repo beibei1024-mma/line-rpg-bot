@@ -100,7 +100,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 4. ⚔️ 核心戰鬥揮刀、防禦與主動技能公式實體連動
+    # 4. ⚔️ 核心戰鬥揮刀、防禦與主動技能公式實體連動 (✨ 終極防彈空格清洗優化版)
     elif user_msg == "攻擊" or user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
         if p["hp"] <= 0 or p["enemy"] is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法發動戰鬥（可能已陣亡或周圍沒有怪物）。"))
@@ -108,40 +108,45 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             
         enemy = p["enemy"]
         log = ""
-        is_skill = user_msg.startswith("使用技能") and user_msg != "使用技能防禦"
-        is_defense = (user_msg == "使用技能防禦")
-        skill_name = user_msg.replace("使用技能", "").strip() if is_skill else ""
+        
+        # ✨ 【Bug 終極封印 1】優先判定是否為防禦，並強制清洗所有口令內部殘留的半形/全形空格！
+        clean_msg = user_msg.replace(" ", "").strip()
+        is_defense = (clean_msg == "使用技能防禦" or clean_msg == "技能防禦")
+        is_skill = clean_msg.startswith("使用技能") and not is_defense
+        
+        # 提取技能名稱時同步蒸發空格
+        skill_name = clean_msg.replace("使用技能", "").strip() if is_skill else ""
         
         # 🛡️ 戰場狀態因子初始化
         p_defense_multiplier = 1.0
         total_p_dmg = 0
         
-        # ✨ 優化二：臨時技能防禦大腦
+        # ✨ 【Bug 終極封印 2】將臨時技能防禦大腦移至最高優先級，徹底防止被技能樹字典攔截報錯！
         if is_defense:
             p_defense_multiplier = 3.0 # 本回合防禦力暴增 3 倍
-            log += "🛡️ 戰術防禦！你架起防禦姿態，本回合防禦力暴增 3 倍，全神貫注準備抵擋目標的反擊！\n"
+            log += "🛡️ 戰術防禦！你架起鋼鐵防護姿態，本回合防禦力暴增 3 倍，全神貫注準備抵擋目標的反擊！\n"
             
-        # ✨ 優化一：技能實體扣 MP 與專屬公式大數據對齊
         elif is_skill:
             if skill_name not in job_mod["skills"]:
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 技能錯誤！你目前不會【{skill_name}】法術。"))
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 技能錯誤！你目前職業的天賦樹中不會【{skill_name}】法術，請重新確認口令。"))
                 return
             mp_cost = job_mod["skills"][skill_name].get("mp_cost", 0)
             safe_mp = p.get("mp", calculated_max_mp)
             if safe_mp < mp_cost:
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔷 魔力枯竭！施放【{skill_name}】需要 {mp_cost} 點 MP，你目前只有 {safe_mp} 點！"))
                 return
+                
             # 實體扣除魔力
             p["mp"] = safe_mp - mp_cost
             log += f"🔮 奧義發動！你消耗了 🔷 {mp_cost} 點 MP 施放秘術 ── ⚡【{skill_name}】！\n"
             
-            # 🔮 各派系神級主動技能「屬性實體掛鉤公式」連動
-            if skill_name in ["蓄力重擊", "旋風斬", "怒火重擊", "橫掃千軍"]:
-                total_p_dmg = int((12 + str_val + w_bonus) * 1.8) # 力量型
+            # 各派系神級主動技能公式
+            if skill_name in ["蓄力重擊", "旋風斬", "怒火重擊", "橫掃千軍", "破甲一擊", "戰吼震懾"]:
+                total_p_dmg = int((12 + str_val + w_bonus) * 1.8) # 物理戰技
             elif skill_name in ["火球術", "元素暴風", "極凍終焉", "末日流星", "聖光懲戒"]:
-                total_p_dmg = int((10 + int_val) * 2.5) # 智力型
+                total_p_dmg = int((10 + int_val) * 2.5) # 魔法戰技
             elif skill_name in ["二連矢", "毒刃襲擊", "狙擊一擊", "暴風萬箭破", "瞬獄殺"]:
-                total_p_dmg = int((12 + agi_val + w_bonus) * 2.2) # 敏捷型
+                total_p_dmg = int((12 + agi_val + w_bonus) * 2.2) # 敏捷戰技
             elif skill_name == "治癒術" or skill_name == "群體療癒":
                 heal = int((int_val + men_val) * 2.0)
                 old_h = p["hp"]
@@ -170,28 +175,24 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
 
         # 扣除怪獸血量
         enemy["hp"] -= total_p_dmg
-        
         # ── 5. 戰鬥大獲全勝結算 ──
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
             gold_data = enemy["gold_range"]
             
-            # ✨ 【安全索引解包】精準抽離元組或單一整數，徹底封印 TypeError 與金幣吃字
-            min_gold = int(gold_data[0]) if isinstance(gold_data, (tuple, list)) else int(gold_data)
-            max_gold = int(gold_data[1]) if isinstance(gold_data, (tuple, list)) else int(gold_data)
+            min_gold = int(gold_data) if isinstance(gold_data, (tuple, list)) else int(gold_data)
+            max_gold = int(gold_data) if isinstance(gold_data, (tuple, list)) else int(gold_data)
             final_gold = int(random.randint(min_gold, max_gold) * gold_mod)
             p["gold"] += final_gold; p["exp"] += enemy["exp"]
             
             p["mp"] = min(calculated_max_mp, p["mp"] + 25) 
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力恢復 +25 點。\n"
             
-            # 5% 驚喜爆裝機制 (全自動送入背包收藏庫，拒絕直接武裝上身)
             if random.random() < 0.05:
                 current_loc = p.get("current_map", "新手村")
                 matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if current_loc[:2] in w_name or (current_loc == "新手村" and "新手" in w_name)]
                 if matched_weapons:
                     drop_w = random.choice(matched_weapons)
-                    # 🚀 安全調用工坊背包大腦入庫，保持玩家當前手持武器不變
                     forge_system.add_to_weapon_inventory(p, drop_w)
                     log += f"💎 🔥 🗺️ 【神裝降臨・直接入庫】 🗺️ 🔥 💎\n你擊敗魔物搜刮戰場，驚喜搜刮到了該區域的專屬神兵 ── ⚔️【{drop_w}】！\n📦 存放去向：寶物已為您送入【我的背包】裝備收藏庫，快去開包更換吧！\n"
 
@@ -210,8 +211,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             db_core.save_player(p)
             
             card_data = db_core.make_battle_card(log, p, None)
-            
-            # ✨ 【v3 發送對齊】回歸標準非同步封裝模型，完美消滅 JSON 序列化物件衝突地雷
             msg_payload = {
                 "replyToken": event.reply_token,
                 "messages": [{
@@ -234,6 +233,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             if "精神污染" in enemy.get("skill", ""): p["mp"] = max(0, p["mp"] - 20); log += f"\n👁️ 🚨 邪神被動【精神污染】！魔力值被吸走 20 點！"
 
             final_m_atk = random.randint(1, enemy["atk"])
+            # 套用優化二的 3 倍防禦力加乘計算
             p_def = int((vit_val // 2) * p_defense_multiplier)
             dmg_received = max(1, final_m_atk - p_def)
             p["hp"] = max(0, p["hp"] - dmg_received)
@@ -258,7 +258,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
                 
     else:
-        # 🛑 【極致乾淨】唯一的最外層萬能保底入口，彻底清洗掉所有殘留的重複重疊代碼！
         card_data = db_core.make_battle_card("💡 系統提示：請利用螢幕最下方可以左右橫向滑動的小圖標，直接點擊按鈕來展開您的冒險旅程！", p, None)
         msg_payload = {
             "replyToken": event.reply_token,
