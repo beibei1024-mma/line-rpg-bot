@@ -35,16 +35,14 @@ def get_bag_card(p):
         {"type": "separator", "margin": "md", "color": "#333333"}
     ]
     
-    # 🌟 1. 核心優化：【 ⚔️ 裝備與兵器收藏庫 】視覺化網格圖卡化展示
+    # 1. 核心優化：【 ⚔️ 裝備與兵器收藏庫 】視覺化網格圖卡化展示
     contents.append({"type": "text", "text": "⚔️ 【 裝備與兵器收藏庫 】", "weight": "bold", "size": "sm", "color": "#007AFF", "margin": "md"})
     
     active_weapons = {k: v for k, v in weapons_held.items() if v > 0}
     if not active_weapons:
         contents.append({"type": "text", "text": "   (您的裝備背包空空如也，快去商店或野外打寶！)", "size": "xs", "color": "#8E8E93"})
     else:
-        # ✨ 【UI/UX 大革新】疊代包包裡擁有的每把武器，實體列出素質、並直接上架「一鍵裝備」按鈕！
         for w_name, count in active_weapons.items():
-            # 自動從 weapons.py 提取對應武器的攻擊力數值與敘述（清除詞綴前綴防呆）
             pure_w_name = w_name.split(" 的 ")[-1] if " 的 " in w_name else w_name
             w_info = weapons.SHOP_WEAPONS.get(pure_w_name, {"atk_bonus": 0, "desc": "未知神秘兵器。"})
             
@@ -55,10 +53,8 @@ def get_bag_card(p):
                         {"type": "text", "text": f"🗡️ {w_name}", "size": "sm", "color": "#FF9500", "weight": "bold", "flex": 4},
                         {"type": "text", "text": f"擁有: {count} 把", "size": "xs", "color": "#34AADC", "align": "end", "flex": 2}
                     ]},
-                    # ✨ 實體顯示武器裝備的傷害素質！
                     {"type": "text", "text": f"💥 物理傷害加成：+{w_info['atk_bonus']} 點", "size": "xs", "color": "#4CD964", "margin": "xs", "weight": "bold"},
                     {"type": "text", "text": f"📖 兵器神話：{w_info['desc']}", "size": "xs", "color": "#8E8E93", "margin": "xs", "wrap": True},
-                    # ✨ 實體「一鍵穿戴」快捷點擊按鈕，點擊秒換裝！
                     {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "marginTop": "sm",
                      "action": {"type": "message", "label": "⚔️ 立即裝備上身", "text": f"裝備 {w_name}"}}
                 ]
@@ -149,21 +145,28 @@ def add_to_inventory(p, item_name, is_material=False):
     p["inventory"] = inv
 
 def use_potion(p, potion_name):
+    """🧪 喝藥水補血大腦"""
     if "inventory" not in p or not p["inventory"]: return "❌ 背包空無一物！"
     inv = p["inventory"]
     items = inv.get("items", {})
     if potion_name not in items or items[potion_name] <= 0: return f"❌ 沒有【{potion_name}】。"
+    
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
     vit_val = int(p.get("vitality", 10) * job_mod["vit_mod"])
     max_hp = 100 + (vit_val * 5) + (level * 15)
+
     if p["hp"] <= 0: return "💀 你已經陣亡了！請先【復活】。"
     if p["hp"] >= max_hp: return "💚 生命值已滿，不需浪費藥水！"
     if potion_name not in CONSUMABLES: return "❌ 非可食用的藥水。"
+    
     config = CONSUMABLES[potion_name]
-    heal_amount = random.randint(config["heal_range"], config["heal_range"])
+    
+    # ✨ 【Bug 終極封印】精準為元組加上索引值 0 與 1，拆解出最小值與最大值，徹底消滅 random.randint 閃退！
+    heal_amount = random.randint(int(config["heal_range"][0]), int(config["heal_range"][1]))
+    
     old_hp = p["hp"]
     p["hp"] = min(max_hp, p["hp"] + heal_amount)
     items[potion_name] -= 1
