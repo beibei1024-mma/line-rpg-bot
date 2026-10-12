@@ -14,7 +14,7 @@ from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
 from linebot.models import TextSendMessage, FlexSendMessage
 
 def process_game_logic(event, line_bot_api, configuration):
-    """【皇家分流主控台 完全體】精準校正背包回圈路由，徹底消滅 AttributeError"""
+    """【皇家全功能主控台 生死大合流版】"""
     user_id = event.source.user_id
     user_msg = event.message.text.replace(" ", "").strip()
     
@@ -31,27 +31,29 @@ def process_game_logic(event, line_bot_api, configuration):
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 👤 1. 處理【我的狀態】面板 
+    # 😇 【真・生死管道合流】精準攔截「復活」口令！改用最防彈的 v3 Dict 非同步發送組合包！
+    elif user_msg == "復活" or user_msg == "祈求復活":
+        card_data = player.handle_resurrect(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "勇者復活歸來", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
+
+    # 1. 基礎狀態查詢分流 (全區開放)
     if user_msg == "我的狀態" or user_msg == "狀態":
         card_data = player.get_status_card(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的狀態面板", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
-        
-    # 🎒 2. 處理【我的背包】倉庫 ➡️ ✨ 【Bug 終極校正點】改用標準 v3 Dict 非同步發送模型，完美咬合對齊！
     elif user_msg == "我的背包" or user_msg == "背包":
         card_data = bag.get_bag_card(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的私人物品倉庫", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
-        
-    # 🛡️ 3. 處理【我的裝備】裝備欄
     elif user_msg == "我的裝備" or user_msg == "裝備":
         card_data = forge_system.get_equipment_card(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的神聖裝備欄", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
-        
     elif user_msg == "脫下裝備":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
         return
@@ -127,7 +129,7 @@ def process_game_logic(event, line_bot_api, configuration):
                 with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
         elif user_msg in ["尋找怪物", "尋怪", "攻擊", "使用技能"]:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖擺【🚪 出城冒險】傳送至野外獵怪！"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
             return
 
     # 🌲 處於野外危險區的指令導流
