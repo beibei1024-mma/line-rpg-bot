@@ -1,4 +1,4 @@
-# jobs.py - 全新精簡版「6/4/3 主被動核心技能樹數據庫」
+# jobs.py - 精簡優化版「6/4/3 主被動核心技能樹數據庫」
 
 JOBS_DATA = {
     "初心者": {
@@ -14,7 +14,6 @@ JOBS_DATA = {
         "tier": 1, "req_lvl": 25, "next_jobs": ["狂戰士"],
         "str_mod": 1.3, "agi_mod": 1.0, "int_mod": 0.6, "vit_mod": 1.2, "luk_mod": 1.0, "men_mod": 0.9,
         "skills": {
-            # ⚔️ 一轉：總共 6 個技能 (4主動出現在標籤，2被動隱藏)
             "蓄力重擊": {"type": "active", "mp_cost": 15, "desc": "1.6倍物理猛擊"},
             "橫掃千軍": {"type": "active", "mp_cost": 20, "desc": "猛烈揮砍周圍敵軍"},
             "戰吼震懾": {"type": "active", "mp_cost": 10, "desc": "發出怒吼震懾目標"},
@@ -27,7 +26,6 @@ JOBS_DATA = {
         "tier": 2, "req_lvl": 50, "next_jobs": ["修羅"],
         "str_mod": 1.8, "agi_mod": 1.2, "int_mod": 0.4, "vit_mod": 1.4, "luk_mod": 1.2, "men_mod": 0.7,
         "skills": {
-            # ⚔️ 一轉繼承 + 額外增加 4 個技能 (3主動，1被動)
             "蓄力重擊": {"type": "active", "mp_cost": 15, "desc": "1.6倍物理猛擊"},
             "橫掃千軍": {"type": "active", "mp_cost": 20, "desc": "猛烈揮砍周圍敵軍"},
             "戰吼震懾": {"type": "active", "mp_cost": 10, "desc": "發出怒吼震懾目標"},
@@ -43,7 +41,6 @@ JOBS_DATA = {
         "tier": 3, "req_lvl": 100, "next_jobs": [],
         "str_mod": 2.4, "agi_mod": 1.5, "int_mod": 0.3, "vit_mod": 1.6, "luk_mod": 1.5, "men_mod": 0.5,
         "skills": {
-            # ⚔️ 二轉繼承 + 額外增加 3 個技能 (3主動，0被動) = 總共 10 主動 3 被動
             "蓄力重擊": {"type": "active", "mp_cost": 15, "desc": "1.6倍物理猛擊"},
             "橫掃千軍": {"type": "active", "mp_cost": 20, "desc": "猛烈揮砍周圍敵軍"},
             "戰吼震懾": {"type": "active", "mp_cost": 10, "desc": "發出怒吼震懾目標"},
@@ -63,7 +60,6 @@ JOBS_DATA = {
         "tier": 1, "req_lvl": 25, "next_jobs": ["十字軍"],
         "str_mod": 1.1, "agi_mod": 0.8, "int_mod": 0.7, "vit_mod": 1.5, "luk_mod": 0.9, "men_mod": 1.2,
         "skills": {
-            # 🛡️ 一轉：總共 6 個技能 (4主動，2被動)
             "盾擊": {"type": "active", "mp_cost": 15, "desc": "基礎防禦盾牌重擊"},
             "挑釁": {"type": "active", "mp_cost": 10, "desc": "強行吸引怪物注意力"},
             "神聖之光": {"type": "active", "mp_cost": 20, "desc": "聖光戰技附體"},
@@ -76,7 +72,6 @@ JOBS_DATA = {
         "tier": 2, "req_lvl": 50, "next_jobs": ["督軍"],
         "str_mod": 1.3, "agi_mod": 0.8, "int_mod": 1.0, "vit_mod": 2.0, "luk_mod": 1.0, "men_mod": 1.5,
         "skills": {
-            # 🛡️ 二轉：追加 4 個技能 (3主動，1被動)
             "盾擊": {"type": "active", "mp_cost": 15, "desc": "基礎防禦盾牌重擊"},
             "挑釁": {"type": "active", "mp_cost": 10, "desc": "強行吸引怪物注意力"},
             "神聖之光": {"type": "active", "mp_cost": 20, "desc": "聖光戰技附體"},
@@ -92,7 +87,6 @@ JOBS_DATA = {
         "tier": 3, "req_lvl": 100, "next_jobs": [],
         "str_mod": 1.6, "agi_mod": 0.9, "int_mod": 1.1, "vit_mod": 2.7, "luk_mod": 1.1, "men_mod": 1.9,
         "skills": {
-            # 🛡️ 三轉：追加 3 個技能 (3主動，0被動)
             "盾擊": {"type": "active", "mp_cost": 15, "desc": "基礎防禦盾牌重擊"},
             "挑釁": {"type": "active", "mp_cost": 10, "desc": "強行吸引怪物注意力"},
             "神聖之光": {"type": "active", "mp_cost": 20, "desc": "聖光戰技附體"},
@@ -112,7 +106,6 @@ JOBS_DATA = {
         "tier": 1, "req_lvl": 25, "next_jobs": ["魔導士"],
         "str_mod": 0.4, "agi_mod": 1.0, "int_mod": 1.5, "vit_mod": 0.8, "luk_mod": 1.1, "men_mod": 1.3,
         "skills": {
-            # 🔮 一轉：總共 6 個技能 (4主動，2被動)
             "火球術": {"type": "active", "mp_cost": 20, "desc": "智力倍率1.8倍高額火系魔傷"},
             "魔能彈": {"type": "active", "mp_cost": 15, "desc": "基礎魔法射擊"},
             "閃電術": {"type": "active", "mp_cost": 25, "desc": "引導落雷割裂目標"},
@@ -125,7 +118,6 @@ JOBS_DATA = {
         "tier": 2, "req_lvl": 50, "next_jobs": ["元素使"],
         "str_mod": 0.3, "agi_mod": 1.1, "int_mod": 2.1, "vit_mod": 0.7, "luk_mod": 1.2, "men_mod": 1.6,
         "skills": {
-            # 🔮 二轉：追加 4 個技能 (3主動，1被動)
             "火球術": {"type": "active", "mp_cost": 20, "desc": "智力倍率1.8倍高額火系魔傷"},
             "魔能彈": {"type": "active", "mp_cost": 15, "desc": "基礎魔法射擊"},
             "閃電術": {"type": "active", "mp_cost": 25, "desc": "引導落雷割裂目標"},
@@ -141,7 +133,6 @@ JOBS_DATA = {
         "tier": 3, "req_lvl": 100, "next_jobs": [],
         "str_mod": 0.2, "agi_mod": 1.3, "int_mod": 2.8, "vit_mod": 0.6, "luk_mod": 1.3, "men_mod": 2.1,
         "skills": {
-            # 🔮 三轉：追加 3 個技能 (3主動，0被動)
             "火球術": {"type": "active", "mp_cost": 20, "desc": "智力倍率1.8倍高額火系魔傷"},
             "魔能彈": {"type": "active", "mp_cost": 15, "desc": "基礎魔法射擊"},
             "閃電術": {"type": "active", "mp_cost": 25, "desc": "引導落雷割裂目標"},
@@ -154,14 +145,19 @@ JOBS_DATA = {
             "雷神之怒": {"type": "active", "mp_cost": 75, "desc": "引導九天狂雷發動極限閃擊"},
             "法力護盾": {"type": "passive", "desc": "被動"}, "冥想調息": {"type": "passive", "desc": "被動"}, "元素親和": {"type": "passive", "desc": "被動"}
         }
-    },
+    }
+}
+# jobs.py (續篇) - 盜賊、祭師、弓箭手體系與轉職引導系統
 
+from jobs import JOBS_DATA
+
+# 動態擴充後半段職業進入數據庫
+JOBS_DATA.update({
     # 🗡️ 4. 盜賊系 (刺客、暗夜行者)
     "盜賊": {
         "tier": 1, "req_lvl": 25, "next_jobs": ["刺客"],
         "str_mod": 1.0, "agi_mod": 1.5, "int_mod": 0.5, "vit_mod": 0.9, "luk_mod": 1.4, "men_mod": 0.8,
         "skills": {
-            # 🗡️ 一轉：總共 6 個技能 (4主動，2被動)
             "背刺": {"type": "active", "mp_cost": 15, "desc": "基礎潛行刺擊傷害"},
             "毒塗抹": {"type": "active", "mp_cost": 10, "desc": "武器刀刃附加基礎毒素"},
             "煙霧彈": {"type": "active", "mp_cost": 20, "desc": "投擲煙霧進行戰術致盲"},
@@ -174,7 +170,6 @@ JOBS_DATA = {
         "tier": 2, "req_lvl": 50, "next_jobs": ["暗夜行者"],
         "str_mod": 1.1, "agi_mod": 2.1, "int_mod": 0.4, "vit_mod": 0.8, "luk_mod": 1.8, "men_mod": 0.6,
         "skills": {
-            # 🗡️ 二轉：追加 4 個技能 (3主動，1被動)
             "背刺": {"type": "active", "mp_cost": 15, "desc": "基礎潛行刺擊傷害"},
             "毒塗抹": {"type": "active", "mp_cost": 10, "desc": "武器刀刃附加基礎毒素"},
             "煙霧彈": {"type": "active", "mp_cost": 20, "desc": "投擲煙霧進行戰術致盲"},
@@ -190,7 +185,6 @@ JOBS_DATA = {
         "tier": 3, "req_lvl": 100, "next_jobs": [],
         "str_mod": 1.3, "agi_mod": 2.9, "int_mod": 0.3, "vit_mod": 0.7, "luk_mod": 2.5, "men_mod": 0.5,
         "skills": {
-            # 🗡️ 三轉：追加 3 個技能 (3主動，0被動)
             "背刺": {"type": "active", "mp_cost": 15, "desc": "基礎潛行刺擊傷害"},
             "毒塗抹": {"type": "active", "mp_cost": 10, "desc": "武器刀刃附加基礎毒素"},
             "煙霧彈": {"type": "active", "mp_cost": 20, "desc": "投擲煙霧進行戰術致盲"},
@@ -210,7 +204,6 @@ JOBS_DATA = {
         "tier": 1, "req_lvl": 25, "next_jobs": ["賢者"],
         "str_mod": 0.7, "agi_mod": 0.8, "int_mod": 1.3, "vit_mod": 1.1, "luk_mod": 1.1, "men_mod": 1.5,
         "skills": {
-            # ⛪ 一轉：總共 6 個技能 (4主動，2被動)
             "治癒術": {"type": "active", "mp_cost": 20, "desc": "恢復智力與精神總和1.5倍生命"},
             "聖光彈": {"type": "active", "mp_cost": 15, "desc": "發射純淨聖光射擊"},
             "神聖祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
@@ -223,7 +216,6 @@ JOBS_DATA = {
         "tier": 2, "req_lvl": 50, "next_jobs": ["大主教"],
         "str_mod": 0.8, "agi_mod": 0.8, "int_mod": 1.6, "vit_mod": 1.2, "luk_mod": 1.2, "men_mod": 2.1,
         "skills": {
-            # ⛪ 二轉：追加 4 個技能 (3主動，1被動)
             "治癒術": {"type": "active", "mp_cost": 20, "desc": "恢復智力與精神總和1.5倍生命"},
             "聖光彈": {"type": "active", "mp_cost": 15, "desc": "發射純淨聖光射擊"},
             "神聖祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
@@ -239,70 +231,66 @@ JOBS_DATA = {
         "tier": 3, "req_lvl": 100, "next_jobs": [],
         "str_mod": 0.9, "agi_mod": 0.9, "int_mod": 2.0, "vit_mod": 1.4, "luk_mod": 1.3, "men_mod": 2.9,
         "skills": {
-            # ⛪ 三轉：追加 3 個技能 (3主動，0被動)
             "治癒術": {"type": "active", "mp_cost": 20, "desc": "恢復智力與精神總和1.5倍生命"},
             "聖光彈": {"type": "active", "mp_cost": 15, "desc": "發射純淨聖光射擊"},
             "神聖祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
-                    "淨化術": {"type": "active", "mp_cost": 12, "desc": "光耀驅散自身異常減益"},
-                    "聖光懲戒": {"type": "active", "mp_cost": 35, "desc": "砸出精神2.2倍魔法傷害"},
-                    "群體療癒": {"type": "active", "mp_cost": 45, "desc": "大範圍光系神聖修復"},
-                    "神聖結界": {"type": "active", "mp_cost": 40, "desc": "降下免傷光之結界"},
-                    "神聖讚美詩": {"type": "active", "mp_cost": 95, "desc": "大主教全螢幕光明大洗禮極限奧義"},
-                    "復活預言": {"type": "active", "mp_cost": 80, "desc": "加持預言光環大幅豁免致命死傷"},
-                    "天使之翼": {"type": "active", "mp_cost": 55, "desc": "召喚高階光輝羽翼發動重創衝擊"},
-                    "祈禱光環": {"type": "passive", "desc": "被動"}, "神聖信仰": {"type": "passive", "desc": "被動"}, "光輝守護": {"type": "passive", "desc": "被動"}
-                }
-            },
+            "淨化術": {"type": "active", "mp_cost": 12, "desc": "光耀驅散自身異常減益"},
+            "聖光懲戒": {"type": "active", "mp_cost": 35, "desc": "砸出精神2.2倍魔法傷害"},
+            "群體療癒": {"type": "active", "mp_cost": 45, "desc": "大範圍光系神聖修復"},
+            "神聖結界": {"type": "active", "mp_cost": 40, "desc": "降下免傷光之結界"},
+            "神聖讚美詩": {"type": "active", "mp_cost": 95, "desc": "大主教全螢幕光明大洗禮極限奧義"},
+            "復活預言": {"type": "active", "mp_cost": 80, "desc": "加持預言光環大幅豁免致命死傷"},
+            "天使之翼": {"type": "active", "mp_cost": 55, "desc": "召喚高階光輝羽翼發動重創衝擊"},
+            "祈禱光環": {"type": "passive", "desc": "被動"}, "神聖信仰": {"type": "passive", "desc": "被動"}, "光輝守護": {"type": "passive", "desc": "被動"}
+        }
+    },
 
-            # 🏹 6. 弓箭手系 (獵人、遊俠)
-            "弓箭手": {
-                "tier": 1, "req_lvl": 25, "next_jobs": ["獵人"],
-                "str_mod": 1.1, "agi_mod": 1.4, "int_mod": 0.6, "vit_mod": 0.9, "luk_mod": 1.3, "men_mod": 0.8,
-                "skills": {
-                    # 🏹 一轉：總共 6 個技能 (4主動，2被動)
-                    "二連矢": {"type": "active", "mp_cost": 15, "desc": "神速拉弓！必定射出兩箭物理穿透箭"},
-                    "蓄力箭": {"type": "active", "mp_cost": 20, "desc": "穩固身形射出強能精準重擊"},
-                    "毒箭": {"type": "active", "mp_cost": 18, "desc": "箭頭附帶劇毒引發持續流血"},
-                    "疾風步": {"type": "active", "mp_cost": 12, "desc": "短暫提升角色在戰場中的閃避機率"},
-                    "鷹眼": {"type": "passive", "desc": "被動：角色戰場命中率與暴擊率基本提升"},
-                    "精確瞄準": {"type": "passive", "desc": "被動：敏捷基本屬性獲得皇家永久強化"}
-                }
-            },
-            "獵人": {
-                "tier": 2, "req_lvl": 50, "next_jobs": ["遊俠"],
-                "str_mod": 1.2, "agi_mod": 1.9, "int_mod": 0.5, "vit_mod": 0.9, "luk_mod": 1.6, "men_mod": 0.6,
-                "skills": {
-                    # 🏹 二轉：追加 4 個技能 (3主動，1被動)
-                    "二連矢": {"type": "active", "mp_cost": 15, "desc": "神速拉弓！必定射出兩箭物理穿透箭"},
-                    "蓄力箭": {"type": "active", "mp_cost": 20, "desc": "穩固身形射出強能精準重擊"},
-                    "毒箭": {"type": "active", "mp_cost": 18, "desc": "箭頭附帶劇毒引發持續流血"},
-                    "疾風步": {"type": "active", "mp_cost": 12, "desc": "短暫提升角色在戰場中的閃避機率"},
-                    "狙擊一擊": {"type": "active", "mp_cost": 40, "desc": "發動致命遠程獵人物理重狙"},
-                    "冰霜陷阱": {"type": "active", "mp_cost": 25, "desc": "佈置陷阱限制怪物閃避與防禦"},
-                    "爆影狂襲": {"type": "active", "mp_cost": 35, "desc": "幻化漫天箭影傾瀉重創目標"},
-                    "野性呼喚": {"type": "passive", "desc": "被動：每回合戰鬥有機率直接使怪物閃避歸零"},
-                    "鷹眼": {"type": "passive", "desc": "被動"}, "精確瞄準": {"type": "passive", "desc": "被動"}
-                }
-            },
-            "遊俠": {
-                "tier": 3, "req_lvl": 100, "next_jobs": [],
-                "str_mod": 1.4, "agi_mod": 2.6, "int_mod": 0.4, "vit_mod": 0.9, "luk_mod": 2.1, "men_mod": 0.5,
-                "skills": {
-                    # 🏹 三轉：追加 3 個技能 (3主動，0被動)
-                    "二連矢": {"type": "active", "mp_cost": 15, "desc": "必定射出兩箭物理穿透箭"},
-                    "蓄力箭": {"type": "active", "mp_cost": 20, "desc": "穩固身形射出強能精準重擊"},
-                    "毒箭": {"type": "active", "mp_cost": 18, "desc": "箭頭附帶劇毒引發持續流血"},
-                    "疾風步": {"type": "active", "mp_cost": 12, "desc": "短暫提升角色在戰場中的閃避機率"},
-                    "狙擊一擊": {"type": "active", "mp_cost": 40, "desc": "發動致命遠程獵人物理重狙"},
-                    "冰霜陷阱": {"type": "active", "mp_cost": 25, "desc": "佈置陷阱限制怪物閃避與防禦"},
-                    "爆影狂襲": {"type": "active", "mp_cost": 35, "desc": "幻化漫天箭影傾瀉重創目標"},
-                    "暴風萬箭破": {"type": "active", "mp_cost": 60, "desc": "萬箭齊發！狂暴傾瀉最高5倍穿透物理奧義"},
-                    "風行者之箭": {"type": "active", "mp_cost": 80, "desc": "凝聚風元引力射出撕裂虛空之箭"},
-                    "群星墜落": {"type": "active", "mp_cost": 95, "desc": "召喚上古星辰箭雨發動全屏寂滅"},
-                    "野性呼喚": {"type": "passive", "desc": "被動"}, "鷹眼": {"type": "passive", "desc": "被動"}, "精確瞄準": {"type": "passive", "desc": "被動"}
-                }
-            }
-}
+    # 🏹 6. 弓箭手系 (獵人、遊俠)
+    "弓箭手": {
+        "tier": 1, "req_lvl": 25, "next_jobs": ["獵人"],
+        "str_mod": 1.1, "agi_mod": 1.4, "int_mod": 0.6, "vit_mod": 0.9, "luk_mod": 1.3, "men_mod": 0.8,
+        "skills": {
+            "二連矢": {"type": "active", "mp_cost": 15, "desc": "神速拉弓！必定射出兩箭物理穿透箭"},
+            "蓄力箭": {"type": "active", "mp_cost": 20, "desc": "穩固身形射出強能精準重擊"},
+            "毒箭": {"type": "active", "mp_cost": 18, "desc": "箭頭附帶劇毒引發持續流血"},
+            "疾風步": {"type": "active", "mp_cost": 12, "desc": "短暫提升角色在戰場中的閃避機率"},
+            "鷹眼": {"type": "passive", "desc": "被動：角色戰場命中率與暴擊率基本提升"},
+            "精確瞄準": {"type": "passive", "desc": "被動：敏捷基本屬性獲得皇家永久強化"}
+        }
+    },
+    "獵人": {
+        "tier": 2, "req_lvl": 50, "next_jobs": ["遊俠"],
+        "str_mod": 1.2, "agi_mod": 1.9, "int_mod": 0.5, "vit_mod": 0.9, "luk_mod": 1.6, "men_mod": 0.6,
+        "skills": {
+            "二連矢": {"type": "active", "mp_cost": 15, "desc": "神速拉弓！必定射出兩箭物理穿透箭"},
+            "蓄力箭": {"type": "active", "mp_cost": 20, "desc": "穩固身形射出強能精準重擊"},
+            "毒箭": {"type": "active", "mp_cost": 18, "desc": "箭頭附帶劇毒引發持續流血"},
+            "疾風步": {"type": "active", "mp_cost": 12, "desc": "短暫提升角色在戰場中的閃避機率"},
+            "狙擊一擊": {"type": "active", "mp_cost": 40, "desc": "發動致命遠程獵人物理重狙"},
+            "冰霜陷阱": {"type": "active", "mp_cost": 25, "desc": "佈置陷阱限制怪物閃避與防禦"},
+            "爆影狂襲": {"type": "active", "mp_cost": 35, "desc": "幻化漫天箭影傾瀉重創目標"},
+            "野性呼喚": {"type": "passive", "desc": "被動：每回合戰鬥有機率直接使怪物閃避歸零"},
+            "鷹眼": {"type": "passive", "desc": "被動"}, "精確瞄準": {"type": "passive", "desc": "被動"}
+        }
+    },
+    "遊俠": {
+        "tier": 3, "req_lvl": 100, "next_jobs": [],
+        "str_mod": 1.4, "agi_mod": 2.6, "int_mod": 0.4, "vit_mod": 0.9, "luk_mod": 2.1, "men_mod": 0.5,
+        "skills": {
+            "二連矢": {"type": "active", "mp_cost": 15, "desc": "必定射出兩箭物理穿透箭"},
+            "蓄力箭": {"type": "active", "mp_cost": 20, "desc": "穩固身形射出強能精準重擊"},
+            "毒箭": {"type": "active", "mp_cost": 18, "desc": "箭頭附帶劇毒引發持續流血"},
+            "疾風步": {"type": "active", "mp_cost": 12, "desc": "短暫提升角色在戰場中的閃避機率"},
+            "狙擊一擊": {"type": "active", "mp_cost": 40, "desc": "發動致命遠程獵人物理重狙"},
+            "冰霜陷阱": {"type": "active", "mp_cost": 25, "desc": "佈置陷阱限制怪物閃避與防禦"},
+            "爆影狂襲": {"type": "active", "mp_cost": 35, "desc": "幻化漫天箭影傾瀉重創目標"},
+            "暴風萬箭破": {"type": "active", "mp_cost": 60, "desc": "萬箭齊發！狂暴傾瀉最高5倍穿透物理奧義"},
+            "風行者之箭": {"type": "active", "mp_cost": 80, "desc": "凝聚風元引力射出撕裂虛空之箭"},
+            "群星墜落": {"type": "active", "mp_cost": 95, "desc": "召喚上古星辰箭雨發動全屏寂滅"},
+            "野性呼喚": {"type": "passive", "desc": "被動"}, "鷹眼": {"type": "passive", "desc": "被動"}, "精確瞄準": {"type": "passive", "desc": "被動"}
+        }
+    }
+})
 
 def get_job_options_text(p):
     """🔮 轉職導引提示面板大腦"""
@@ -330,3 +318,4 @@ def get_job_options_text(p):
                 text += f"   ┗ 🔮 {s_name}：{s_info['desc']}\n"
     text += "─────────────────\n✍️ 突破法術口令：輸入【轉職 職業名稱】即可完成覺醒！\n（例如：轉職 戰士）"
     return text
+
