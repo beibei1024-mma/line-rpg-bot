@@ -1,134 +1,99 @@
+# player.py - 勇者皇家私人物資與狀態控制中心
+
 import db_core
-import weapons
 import jobs
-from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
+import weapons
 
 def get_status_card(p):
-    """👤 生成高質感 4 層橫向網格狀態面板 (自帶導航回圈)"""
+    """👤 生成網格化勇者個人神聖屬性面板與自由配點 UI"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
-    job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
-    
-    str_val = int(p.get("strength", 10 + (level * 3)) * job_mod["str_mod"])
-    agi_val = int(p.get("agility", 10 + (level * 2)) * job_mod["agi_mod"])
-    int_val = int(p.get("intelligence", 10 + (level * 2)) * job_mod["int_mod"])
-    vit_val = int(p.get("vitality", 10 + (level * 3)) * job_mod["vit_mod"])
-    luk_val = int(p.get("luck", 10 + (level * 1)) * job_mod["luk_mod"])
-    men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
-    free_pts = p.get("attribute_points", 0)
-    
-    w_bonus = weapons.SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in weapons.SHOP_WEAPONS else 0
-    p_atk_single = 12 + str_val + w_bonus
-    m_atk_single = 10 + int_val
-    
-    p_def = vit_val // 2
-    m_def = men_val // 2
-    
-    double_chance = min(60, 2 + (agi_val // 6))
-    crit_chance = min(80, 10 + (luk_val // 5))
-    
+    if current_job not in jobs.JOBS_DATA: current_job = "初心者"
+    job_mod = jobs.JOBS_DATA[current_job]
+
+    # 六大基礎屬性
+    b_str = p.get("strength", 10)
+    b_agi = p.get("agility", 10)
+    b_int = p.get("intelligence", 10)
+    b_vit = p.get("vitality", 10)
+    b_luk = p.get("luck", 10)
+    b_men = p.get("sprit", 10)
+
+    # 實體乘算最終面板戰力
+    str_val = int(b_str * job_mod["str_mod"])
+    agi_val = int(b_agi * job_mod["agi_mod"])
+    int_val = int(b_int * job_mod["int_mod"])
+    vit_val = int(b_vit * job_mod["vit_mod"])
+    luk_val = int(b_luk * job_mod["luk_mod"])
+    men_val = int(b_men * job_mod["men_mod"])
+
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
     
-    current_mp = p.get("mp")
-    if current_mp is None or current_mp == "None":
-        current_mp = calculated_max_mp
-        p["mp"] = calculated_max_mp
-    
-    status_color = "#FFCC00" if free_pts > 0 else "#8E8E93"
-    
-    flex_bubble = {
-        "type": "bubble",
-        "styles": {"body": {"backgroundColor": "#111111"}},
-        "body": {
-            "type": "box", "layout": "vertical", "spacing": "md",
-            "contents": [
-                {"type": "text", "text": f"👤 勇者狀態面板 (Lv.{level})", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-                {"type": "separator", "color": "#333333"},
-                {"type": "box", "layout": "vertical", "spacing": "xs", "contents": [
-                    {"type": "text", "text": f"🎭 目前職業：🔥【{current_job}】", "size": "sm", "color": "#007AFF", "weight": "bold"},
-                    {"type": "text", "text": f"💰 擁有金幣：🪙 {p['gold']}", "size": "sm", "color": "#FFD700"},
-                    {"type": "text", "text": f"🌟 經驗進度：{p['exp']} / {level * 50}", "size": "sm", "color": "#AF52DE"},
-                    {"type": "text", "text": f"✨ 剩餘潛能點數：{free_pts} 點", "size": "sm", "color": status_color, "weight": "bold"}
-                ]},
-                {"type": "separator", "color": "#333333"},
-                {"type": "text", "text": "🧬 【 角色素質 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
-                {"type": "box", "layout": "horizontal", "contents": [
-                    {"type": "text", "text": f"💪 力量: {str_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
-                    {"type": "text", "text": f"⚡ 敏捷: {agi_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
-                    {"type": "text", "text": f"🔮 智力: {int_val}", "size": "xs", "color": "#FFFFFF", "flex": 1}
-                ]},
-                {"type": "box", "layout": "horizontal", "contents": [
-                    {"type": "text", "text": f"🛡️ 體力: {vit_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
-                    {"type": "text", "text": f"🍀 幸運: {luk_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
-                    {"type": "text", "text": f"🌟 精神: {men_val}", "size": "xs", "color": "#FFFFFF", "flex": 1}
-                ]},
-                {"type": "separator", "color": "#222222", "margin": "sm"},
-                {"type": "box", "layout": "horizontal", "contents": [
-                    {"type": "text", "text": f"💥 物傷: {p_atk_single}", "size": "xs", "color": "#FF9500", "flex": 1},
-                    {"type": "text", "text": f"🔮 魔傷: {m_atk_single}", "size": "xs", "color": "#5AC8FA", "flex": 1}
-                ]},
-                {"type": "box", "layout": "horizontal", "contents": [
-                    {"type": "text", "text": f"🧱 物防: {p_def}", "size": "xs", "color": "#FF3B30", "flex": 1},
-                    {"type": "text", "text": f"🌀 法防: {m_def}", "size": "xs", "color": "#AF52DE", "flex": 1}
-                ]},
-                {"type": "separator", "color": "#222222", "margin": "sm"},
-                {"type": "box", "layout": "horizontal", "contents": [
-                    {"type": "text", "text": f"💨 連擊率: {double_chance}%", "size": "xs", "color": "#E0E0E0", "flex": 1},
-                    {"type": "text", "text": f"✨ 爆擊率: {crit_chance}%", "size": "xs", "color": "#FFCC00", "weight": "bold", "flex": 1}
-                ]},
-                {"type": "separator", "color": "#222222", "margin": "sm"},
-                {"type": "box", "layout": "horizontal", "contents": [
-                    {"type": "text", "text": f"💖 血量: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#4CD964", "flex": 1},
-                    {"type": "text", "text": f"🔷 魔力: {current_mp} / {calculated_max_mp}", "size": "xs", "color": "#007AFF", "flex": 1}
-                ]}
-            ]
-        }
-    }
-    
-    if free_pts > 0:
-        flex_bubble["footer"] = {
-            "type": "box", "layout": "vertical", "backgroundColor": "#1C1C1E",
-            "contents": [{"type": "text", "text": "💡 提示：輸入【加點 屬性名稱 點數】配點。（例如：加點 力量 5）", "size": "xs", "color": "#8E8E93", "align": "center", "wrap": True}]
-        }
+    # 讀取當前裝備總攻擊力
+    current_weapon = p.get("weapon", "赤手空拳")
+    pure_w_name = current_weapon.split(" 的 ")[-1] if " 的 " in current_weapon else current_weapon
+    w_bonus = weapons.SHOP_WEAPONS[pure_w_name]["atk_bonus"] if pure_w_name in weapons.SHOP_WEAPONS else 0
+    w_bonus += int(p.get("forge_weapon_bonus", 0))
 
-    quick_items = [
-        QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")),
-        QuickReplyItem(action=MessageAction(label="🛡️ 我的裝備", text="我的裝備")),
-        QuickReplyItem(action=MessageAction(label="🏪 補給商店", text="冒險商店")),
-        QuickReplyItem(action=MessageAction(label="🦅 返回城鎮", text="回城"))
+    contents = [
+        {"type": "text", "text": f"👤 勇者：【 {p['user_id'][:8]}... 】", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+        {"type": "text", "text": f"👑 職業信仰：✨ {current_job} (階級 T{job_mod['tier']})", "size": "sm", "color": "#34AADC", "align": "center"},
+        {"type": "separator", "margin": "sm", "color": "#333333"},
+        {"type": "text", "text": f"📊 當前等級：Lv.{p['level']}  (經驗: {p['exp']}/{p['level']*50})", "size": "xs", "color": "#E0E0E0"},
+        {"type": "text", "text": f"🩸 皇家血量：{p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#4CD964"},
+        {"type": "text", "text": f"🔷 皇家魔力：{p.get('mp', calculated_max_mp)} / {calculated_max_mp}", "size": "xs", "color": "#007AFF"},
+        {"type": "text", "text": f"🪙 流動資產：🪙 {p['gold']} 金幣", "size": "xs", "color": "#FFCC00"},
+        {"type": "text", "text": f"🗡️ 手持武裝：⚔️ {current_weapon} (物傷 +{w_bonus})", "size": "xs", "color": "#FF9500"},
+        {"type": "text", "text": f"📍 當前星際座標：【 {p.get('current_map', '主城')} 】", "size": "xs", "color": "#AF52DE"},
+        {"type": "separator", "margin": "md", "color": "#333333"},
+        {"type": "text", "text": f"💪 六大核心潛能屬性 (剩餘自由潛能點：{p.get('attribute_points', 0)} 點)", "weight": "bold", "size": "sm", "color": "#FFCC00"}
     ]
-    return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items)}
+
+    # 橫向網格化展示加點項目
+    attr_list = [("力量 (STR)", str_val, "加點力量 1"), ("敏捷 (AGI)", agi_val, "加點敏捷 1"), 
+                 {"name": "智力 (INT)", "val": int_val, "cmd": "加點智力 1"}, {"name": "體力 (VIT)", "val": vit_val, "cmd": "加點體力 1"},
+                 {"name": "幸運 (LUK)", "val": luk_val, "cmd": "加點幸運 1"}, {"name": "精神 (MEN)", "val": men_val, "cmd": "加點精神 1"}]
+                 
+    for i in range(0, len(attr_list), 2):
+        item1 = attr_list[i] if isinstance(attr_list[i], dict) else {"name": attr_list[i][0], "val": attr_list[i][1], "cmd": attr_list[i][2]}
+        item2 = attr_list[i+1] if isinstance(attr_list[i+1], dict) else {"name": attr_list[i+1][0], "val": attr_list[i+1][1], "cmd": attr_list[i+1][2]}
+        
+        contents.append({
+            "type": "box", "layout": "horizontal", "margin": "sm",
+            "contents": [
+                {"type": "text", "text": f"🔸 {item1['name']}: {item1['val']}", "size": "xs", "color": "#E0E0E0", "flex": 1, "gravity": "center"},
+                {"type": "button", "style": "primary", "color": "#2C2C2E", "height": "sm", "flex": 1, "action": {"type": "message", "label": "➕ 點 1", "text": item1['cmd']}},
+                {"type": "text", "text": f"🔸 {item2['name']}: {item2['val']}", "size": "xs", "color": "#E0E0E0", "flex": 1, "gravity": "center"},
+                {"type": "button", "style": "primary", "color": "#2C2C2E", "height": "sm", "flex": 1, "action": {"type": "message", "label": "➕ 點 1", "text": item2['cmd']}}
+            ]
+        })
+
+    flex_bubble = {
+        "type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}},
+        "body": {"type": "box", "layout": "vertical", "spacing": "xs", "contents": contents}
+    }
+    return {"flex": flex_bubble, "quick_reply": db_core.make_battle_card("", p, None)["quick_reply"]}
 
 def handle_resurrect(p):
-    """😇 【復活大腦重構】全面升級為一體化 Dict 智慧組合包，全自動清洗狀態與重設主城小標籤"""
+    """😇 處理勇者復活大腦"""
     if p["hp"] > 0:
-        # 如果玩家根本沒死，回傳提示
-        card = db_core.make_battle_card("💡 提示：勇者！你目前明明生命值健全，不需要使用復活神術。", p, None)
-        return {"flex": card["flex"], "quick_reply": card["quick_reply"]}
+        card = db_core.make_battle_card("💚 提示：您的生命值尚且完好，不需浪費大天使的復活禱告神力！", p, None)
+        return card
         
-    import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
-    
-    str_val = int(p.get("strength", 10 + (level * 3)) * job_mod["str_mod"])
-    vit_val = int(p.get("vitality", 10 + (level * 3)) * job_mod["vit_mod"])
-    men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
-    
+    vit_val = int(p.get("vitality", 10) * job_mod["vit_mod"])
     max_hp = 100 + (vit_val * 5) + (level * 15)
-    max_mp = 50 + (men_val * 4) + (level * 5)
-    
-    # ✨ 核心復活數值改寫：血量與魔力全數充滿！並全自動傳送回「主城」安全區
+
+    # 執行復活：血量灌滿、清空遭遇怪物、自動移回主城、並扣除少量金幣罰則
     p["hp"] = max_hp
-    p["mp"] = max_mp
-    p["current_map"] = "主城"
     p["enemy"] = None
-    p["gold"] = max(0, p["gold"] - 20) # 死亡小扣罰 20 金幣
+    p["current_map"] = "主城"
+    p["gold"] = max(0, p["gold"] - int(p["gold"] * 0.05)) # 死亡懲罰：扣除5%金幣
     db_core.save_player(p)
     
-    log_text = f"😇 ✨ 👼 【 神聖天使・復活術成功 】 👼 ✨ 😇\n─────────────────\n世界樹的讚美詩響起！璀璨的光明法陣在虛空中張開，你被泉水聖光溫柔包覆！\n\n💖 狀態恢復：生命值與魔力值全數充滿爆表 ── 【 🟢 FULL HP/MP 】！\n🏙️ 時空轉移：靈魂已安穩重塑於皇家安全起點 ── 📍【 主城 】！\n🪙 公會稅收：修復靈魂扣除工本費 20 金幣。"
+    log = "😇 🌟 【 聖光降臨・大天使之復活預言 】 🌟 😇\n───────────────────\n諸神聽到了你的悲鳴，神聖法陣在天際撕開裂縫！\n\n✨ 復活成功：你的傷勢已全數痊癒，體力完全恢復！\n🚪 傳送位置：你已被安全送回 ── 📍【主城】區域！\n💸 復活代價：搜刮陣亡軀殼，鐵匠鋪收走 5% 金幣作為維修費。"
     
-    # 呼叫 db_core 生成主城限定的實體 Quick Reply 選單 (簽到、工坊、爬塔、Boss直達鈕)
-    card = db_core.make_battle_card(log_text, p, None)
-    return {"flex": card["flex"], "quick_reply": card["quick_reply"]}
+    return db_core.make_battle_card(log, p, None)
