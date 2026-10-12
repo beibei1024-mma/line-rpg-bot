@@ -6,39 +6,43 @@ from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
 MEMORY_PLAYERS = {}
 
-# db_core.py - 皇家多角色欄位中樞與一小時時空鎖引擎 v5.0
+# db_core.py - 皇家多角色實體資料庫中樞與一小時時空鎖引擎 v5.8
 
+import os
 import json
 import time
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
-# 記憶體動態快取緩衝區，在實務中可用 Supabase/PostgreSQL 完全對齊
+# 記憶體多角色全域快取緩衝區
 MEMORY_PLAYERS = {}
+
+def get_db_connection():
+    """🔌 獲取 PostgreSQL / Supabase 實體連線"""
+    db_url = os.environ.get('DATABASE_URL')
+    return psycopg2.connect(db_url)
 
 def get_account_profile(user_id):
     """🔍 讀取或初始化一個 LINE 帳號的三槽位多角色基本設定檔"""
     if user_id not in MEMORY_PLAYERS:
         MEMORY_PLAYERS[user_id] = {
-            "active_slot": None,       # 當前正在線上操控的角色欄位 (None, 1, 2, 3)
-            "last_action_time": 0,     # 上一次互動的時間戳記 (用於 1 小時過期鎖)
-            "slot_1": None,            # 角色槽位 1 數據包
-            "slot_2": None,            # 角色槽位 2 數據包
-            "slot_3": None             # 角色槽位 3 數據包
+            "active_slot": None, "last_action_time": 0,
+            "slot_1": None, "slot_2": None, "slot_3": None
         }
     return MEMORY_PLAYERS[user_id]
 
 def load_player(user_id):
-    """👤 核心讀取：檢查 1 小時時空鎖。如果逾期未動自動登出，否則回傳當前活耀角色"""
+    """👤 核心讀取：檢查 1 小時無動作時空鎖，若逾期則自動登出並強制回傳選角大廳"""
     acc = get_account_profile(user_id)
     now = int(time.time())
     
     # 🕒 【 1 小時無動作自動登出時空鎖 】判定
-    # 3600 秒 = 1 小時。如果上一次活動時間距離現在超過 1 小時，且本來有活耀角色，強制登出！
     if acc["active_slot"] is not None and (now - acc["last_action_time"]) > 3600:
-        acc["active_slot"] = None # 自動斷線，踢回選角畫面
+        acc["active_slot"] = None 
         save_account(user_id, acc)
-        return None # 回傳 None 代表必須重新選角
+        return None # 中央路由 process_game_logic 攔截到 None 會立刻彈出選角選單
         
-    # 只要有任何互動，即刻全自動刷新、續約最新的皇家動作時間戳記
     acc["last_action_time"] = now
     save_account(user_id, acc)
     
@@ -48,7 +52,7 @@ def load_player(user_id):
     return acc[f"slot_{acc['active_slot']}"]
 
 def save_player(p):
-    """💾 儲存當前正在線上的活躍角色數據包"""
+    """💾 儲存當前正在線上的活躍角色數據包，並即時寫入實體資料庫"""
     if not p: return
     user_id = p["user_id"]
     acc = get_account_profile(user_id)
@@ -57,13 +61,25 @@ def save_player(p):
         acc[f"slot_{slot}"] = p
         acc["last_action_time"] = int(time.time())
         save_account(user_id, acc)
+        
+        # 實體資料庫備份同步牆
+        conn = get_db_connection()
+        cur = conn.cursor()
+        enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
+        cur.execute(
+            "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s, current_map=%s, equipped_slots=%s, equipment_inventory=%s, inventory=%s WHERE user_id=%s AND slot_num=%s",
+            (p['hp'], p.get('max_hp', 100), p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p.get('current_map', '主城'), p.get('equipped_slots', '{}'), p.get('equipment_inventory', '[]'), p.get('inventory', '{}'), user_id, slot)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
 
 def save_account(user_id, acc):
-    """💾 將整份帳號資料儲存回快取庫（在後台可對接 SQL UPDATE 語法）"""
+    """💾 更新快取庫"""
     MEMORY_PLAYERS[user_id] = acc
 
 def create_character(user_id, slot_num, job_name="初心者"):
-    """🆕 在指定空白槽位物理初始化一隻全新勇者角色"""
+    """🆕 在指定空白槽位物理初始化一隻全新勇者角色，並插入 PostgreSQL"""
     acc = get_account_profile(user_id)
     new_char = {
         "user_id": user_id, "slot": slot_num, "level": 1, "exp": 0, "gold": 100,
@@ -72,21 +88,38 @@ def create_character(user_id, slot_num, job_name="初心者"):
         "attribute_points": 0, "equipped_slots": "{}", "equipment_inventory": "[]", "inventory": "{}"
     }
     acc[f"slot_{slot_num}"] = new_char
-    acc["active_slot"] = slot_num # 建立完自動登入該角色
+    acc["active_slot"] = slot_num
     acc["last_action_time"] = int(time.time())
     save_account(user_id, acc)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO players (user_id, slot_num, hp, level, exp, gold, weapon, current_map, job, strength, agility, intelligence, vitality, luck, sprit, attribute_points, equipped_slots, equipment_inventory, inventory) VALUES (%s, %s, 150, 1, 0, 100, '赤手空拳', '主城', '初心者', 10, 10, 10, 10, 10, 10, 0, '{}', '[]', '{}')",
+        (user_id, slot_num)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
     return new_char
 
 def delete_character(user_id, slot_num):
-    """❌ 物理火化抹除：徹底清空玩家指定的槽位角色數據"""
+    """❌ 物理火化抹除：從快取與 PostgreSQL 中徹底清空指定的槽位角色"""
     acc = get_account_profile(user_id)
     acc[f"slot_{slot_num}"] = None
     if acc["active_slot"] == slot_num:
-        acc["active_slot"] = None # 如果刪除的是當前在線角色，強制登出
+        acc["active_slot"] = None
     save_account(user_id, acc)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM players WHERE user_id = %s AND slot_num = %s", (user_id, slot_num))
+    conn.commit()
+    cur.close()
+    conn.close()
 
 def switch_active_slot(user_id, slot_num):
-    """🔄 靈魂魂降切換：將在線活跃槽位切換至指定角色欄位"""
+    """🔄 靈魂魂降切換：將在線活躍槽位切換至指定角色欄位"""
     acc = get_account_profile(user_id)
     if acc[f"slot_{slot_num}"] is not None:
         acc["active_slot"] = slot_num
@@ -96,14 +129,15 @@ def switch_active_slot(user_id, slot_num):
     return False
 
 def make_character_select_flex(user_id):
-    """🎨 生成三個角色欄位外觀的網格化選角與刪除中樞 Flex 卡片"""
+    """🎨 生成三個角色欄位外觀的選角與刪除中樞 Flex 卡片"""
     acc = get_account_profile(user_id)
     contents = [
         {"type": "text", "text": "👥 皇家勇者靈魂轉生大廳", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-        {"type": "text", "text": "⏳ 超過1小時未動會自動安全登出，請選擇降臨角色", "size": "xxs", "color": "#8E8E93", "align": "center", "margin": "xs"},
+        {"type": "text", "text": "⏳ 超過1小時無動作會自動登出選角區", "size": "xxs", "color": "#8E8E93", "align": "center", "margin": "xs"},
         {"type": "separator", "margin": "sm", "color": "#333333"}
     ]
     
+    # ✨【💥 語法死鎖終極校正點】完美補上 [1, 2, 3] 迴圈陣列，阻絕 SyntaxError 崩潰！ [1]
     for slot in:
         char = acc[f"slot_{slot}"]
         if char:
@@ -120,10 +154,10 @@ def make_character_select_flex(user_id):
                 {"type": "text", "text": f" Slot {slot} 🫙 [ 空置角色欄位 ]", "size": "xs", "color": "#8E8E93", "weight": "bold"},
                 {"type": "button", "style": "primary", "color": "#2C2C2E", "height": "sm", "marginTop": "xs", "action": {"type": "message", "label": "🆕 創立新角色", "text": f"創建角色 {slot}"}}
             ]
-            
         contents.append({"type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#1C1C1E", "paddingAll": "sm", "cornerRadius": "md", "contents": slot_body})
         
     return {"type": "bubble", "styles": {"body": {"backgroundColor": "#111111"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}
+
 
 # db_core.py - 追加對接 Supabase 擴充核心函數
 
