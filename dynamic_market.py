@@ -1,4 +1,4 @@
-# dynamic_market.py - 皇家時空動態黑市交易中心 v3.8 (完全體修復版)
+# dynamic_market.py - 皇家時空動態黑市交易中心 v3.9.5 (全局引用連通版)
 
 import random
 import time
@@ -7,11 +7,13 @@ import db_core
 import equipment_core
 import bag
 
+# ✨【核心修正點】在頂部完整導入 player_equipment 模組，徹底消滅 NameError！
+import player_equipment
+
 def refresh_shop_stock(p):
     """⏳ 時空齒輪流轉：全自動判定或強刷生出一份動態限量小貨架"""
-    current_time_seed = int(time.time() // 3600) # 每小時自動自然過期
+    current_time_seed = int(time.time() // 3600)
     
-    # 如果玩家身上已有當前小時的貨架且未過期，直接讀取
     if "shop_seed" in p and p["shop_seed"] == current_time_seed and p.get("shop_goods"):
         if isinstance(p["shop_goods"], str):
             try: return json.loads(p["shop_goods"])
@@ -19,7 +21,6 @@ def refresh_shop_stock(p):
         else:
             return p["shop_goods"]
         
-    # 重新開爐生成 6 格隨機動態限量商品
     new_goods = []
     
     # 欄位 1~2：保底藥水補給物資
@@ -53,13 +54,13 @@ def refresh_shop_stock(p):
     })
     
     p["shop_seed"] = current_time_seed
-    p["shop_goods"] = new_goods # 儲存物件，後台驅動會自動轉 JSON
+    p["shop_goods"] = new_goods
     db_core.save_player(p)
     return new_goods
 
 def get_market_flex(p):
     """🏪 生成極致奢華的動態黑市限量貨架 Flex 卡片"""
-    goods = refresh_shop_stock(p) # ✨【修正點】完美對齊同檔案內的刷新大腦
+    goods = refresh_shop_stock(p)
     contents = [
         {"type": "text", "text": "🏪 皇家暗黑動態時空黑市", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
         {"type": "text", "text": f"🪙 金幣：{p['gold']} | ⏳ 每小時全自動更新", "size": "xs", "color": "#FFCC00", "align": "center", "margin": "xs"},
@@ -113,7 +114,8 @@ def execute_market_buy(p, idx_str):
     elif target_item["type"] in ["equipment", "mystery_box"]:
         slots = ["武器", "頭盔", "鎧甲", "護手", "鞋子", "飾品"]
         eq = target_item["data"] if target_item["type"] == "equipment" else equipment_core.generate_random_equipment(random.choice(slots), "鐵劍")
-        from player_equipment import _add_to_equipment_inventory
+        
+        # ✨【修正點】此時頂部已有完整 import player_equipment，調用絕對安全流暢！
         player_equipment._add_to_equipment_inventory(p, eq)
         log += f"🛡️【{eq['name']}】！已送入裝備背包。"
         
