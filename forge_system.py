@@ -1,159 +1,89 @@
+# forge_system.py - 皇家禁忌工坊與隨機熔煉核心大腦 v3.0
+
 import json
 import random
 import db_core
-import weapons
-from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
+import equipment_core
+import player_equipment
 
+# 📜 皇家遠古手工鍛造圖紙配方庫 (消耗金幣與各地圖素材)
 FORGE_RECIPES = {
-    "新手鐵短劍": {"cost_gold": 100, "materials": {"史萊姆黏液": 3, "破爛的匕首": 1}, "target": "新手鐵短劍"},
-    "微光木藤弓": {"cost_gold": 500, "materials": {"強韌蜘蛛絲": 5, "古樹核心": 1}, "target": "微光木藤弓"},
-    "凜冬不融碎冰刺": {"cost_gold": 1500, "materials": {"不融冰塊": 10, "寒冰精粹": 2}, "target": "凜冬不融碎冰刺"},
-    "黑曜熔岩大劍": {"cost_gold": 4000, "materials": {"熔岩核心": 12, "黑曜石外殼": 4}, "target": "黑曜熔岩大劍"},
-    "荒漠斬馬刀": {"cost_gold": 9000, "materials": {"古老生鏽長劍": 3, "強盜面罩": 5}, "target": "荒漠斬馬刀"},
-    "魔化冥鐵重鐮": {"cost_gold": 25000, "materials": {"永夜陰影": 15, "魔化冥鐵鎧甲": 2}, "target": "魔化冥鐵重鐮"},
-    "紅蓮龍骨逆鱗劍": {"cost_gold": 100000, "materials": {"飛龍雙翼": 10, "巨龍逆鱗": 1}, "target": "紅蓮龍骨逆鱗劍"},
-    "舊神支配者之刃": {"cost_gold": 500000, "materials": {"純淨虛空結晶": 20, "舊神支配者之眼": 1}, "target": "舊神支配者之刃"}
+    "新手鐵短劍": {"slot": "武器", "base": "鐵劍", "gold": 500, "mat": "史萊姆黏液", "mat_qty": 3},
+    "微光木藤弓": {"slot": "武器", "base": "長弓", "gold": 1500, "mat": "強韌蜘蛛絲", "mat_qty": 5},
+    "凜冬不融碎冰刺": {"slot": "武器", "base": "法杖", "gold": 5000, "mat": "不融冰塊", "mat_qty": 5},
+    "黑曜熔岩大劍": {"slot": "武器", "base": "鐵劍", "gold": 12000, "mat": "熔岩核心", "mat_qty": 8},
+    "荒漠斬馬刀": {"slot": "武器", "base": "鐵劍", "gold": 30000, "mat": "古老生鏽長劍", "mat_qty": 10},
+    "皇家獅鷲精鋼重盔": {"slot": "頭盔", "base": "鐵盔", "gold": 25000, "mat": "迅捷羽毛", "mat_qty": 6},
+    "魔化冥鐵重鐮": {"slot": "武器", "base": "法杖", "gold": 75000, "mat": "永夜陰影", "mat_qty": 12},
+    "紅蓮龍骨逆鱗劍": {"slot": "武器", "base": "鐵劍", "gold": 200000, "mat": "巨龍逆鱗", "mat_qty": 1},
+    "舊神支配者之刃": {"slot": "武器", "base": "鐵劍", "gold": 600000, "mat": "舊神支配者之眼", "mat_qty": 1}
 }
 
 def get_forge_menu(p):
+    """🛠️ 生成極致奢華的工坊手工鍛造藍圖 Flex 展售選單"""
     contents = [
-        {"type": "text", "text": "⚒️ 皇家遠古禁忌鍛造工坊", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-        {"type": "text", "text": f"🪙 當前流動資金：🪙 {p['gold']} 金幣", "size": "xs", "color": "#FFCC00", "align": "center"},
+        {"type": "text", "text": "⚒️ 皇家遠古皇家鍛造熔煉工坊", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+        {"type": "text", "text": f"🪙 勇者流動金幣：🪙 {p['gold']} 金幣", "size": "xs", "color": "#FFCC00", "align": "center", "margin": "xs"},
         {"type": "separator", "margin": "sm", "color": "#333333"}
     ]
-    for w_name, req in FORGE_RECIPES.items():
-        w_atk = weapons.SHOP_WEAPONS[w_name]["atk_bonus"]
-        mat_text = ", ".join([f"{k}x{v}" for k, v in req["materials"].items()])
+    
+    # 展示前 5 檔核心神兵圖紙
+    for name, r in list(FORGE_RECIPES.items())[:5]:
         contents.append({
             "type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
             "contents": [
-                {"type": "text", "text": f"⚔️ {w_name} (基礎物傷 +{w_atk})", "size": "sm", "color": "#4CD964", "weight": "bold"},
-                {"type": "text", "text": f"📋 所需材料：{mat_text}", "size": "xs", "color": "#E0E0E0", "margin": "xs"},
-                {"type": "text", "text": f"🪙 手工合成手續費：{req['cost_gold']} 金幣", "size": "xs", "color": "#FF9500", "margin": "xs"},
-                {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "marginTop": "sm",
-                 "action": {"type": "message", "label": f"🔨 開爐鍛造 {w_name}", "text": f"鍛造 {w_name}"}}
+                {"type": "text", "text": f"📜 圖紙：【{name}】({r['slot']})", "size": "xs", "color": "#FF9500", "weight": "bold"},
+                {"type": "text", "text": f"💰 消耗：🪙 {r['gold']} 金幣", "size": "xxs", "color": "#FFCC00", "margin": "xs"},
+                {"type": "text", "text": f"📦 材料：🛠️ {r['mat']} x{r['mat_qty']}", "size": "xxs", "color": "#34AADC"},
+                {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "marginTop": "xs",
+                 "action": {"type": "message", "label": "⚒️ 投入素材開始熔煉", "text": f"鍛造 {name}"}}
             ]
         })
-    quick_items = [
-        QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")),
-        QuickReplyItem(action=MessageAction(label="🛡️ 我的裝備", text="我的裝備")),
-        QuickReplyItem(action=MessageAction(label="🏃 返回世界尋怪", text="尋怪"))
-    ]
-    return {"flex": {"type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}, "quick_reply": QuickReply(items=quick_items)}
-
-def execute_forge_weapon(p, target_weapon):
-    """🔨 遠古工坊合成判定大腦"""
-    target_weapon = target_weapon.replace("鍛造", "").replace("打造", "").replace(" ", "").strip()
-    quick_items = [
-        QuickReplyItem(action=MessageAction(label="⚒️ 返回遠古工坊", text="工坊")),
-        QuickReplyItem(action=MessageAction(label="🛡️ 查看裝備面板", text="我的裝備")),
-        QuickReplyItem(action=MessageAction(label="🏃 返回野外尋怪", text="尋怪"))
-    ]
-    qr_object = QuickReply(items=quick_items)
-    
-    if target_weapon not in FORGE_RECIPES:
-        return {"flex": db_core.make_battle_card(f"❌ 遠古圖紙中沒有【{target_weapon}】的配方。", p, None)["flex"], "quick_reply": qr_object}
-    recipe = FORGE_RECIPES[target_weapon]
-    if p["gold"] < recipe["cost_gold"]:
-        return {"flex": db_core.make_battle_card(f"❌ 🪙 資金不足！需要手續費 {recipe['cost_gold']} 金幣！", p, None)["flex"], "quick_reply": qr_object}
-    
-    inv = p.get("inventory", {"items": {}, "materials": {}})
-    if isinstance(inv, str): inv = json.loads(inv)
-    player_materials = inv.get("materials", {})
-    
-    for mat_name, req_count in recipe["materials"].items():
-        if player_materials.get(mat_name, 0) < req_count:
-            return {"flex": db_core.make_battle_card(f"❌ 💎 素材短缺！需要【{mat_name}】x{req_count}！", p, None)["flex"], "quick_reply": qr_object}
-            
-    p["gold"] -= recipe["cost_gold"]
-    for mat_name, req_count in recipe["materials"].items():
-        player_materials[mat_name] -= req_count
-        if player_materials[mat_name] == 0: del player_materials[mat_name]
         
-    inv["materials"] = player_materials
-    p["inventory"] = inv
-    
-    old_w = p.get("weapon", "赤手空拳")
-    if old_w != "赤手空拳": add_to_weapon_inventory(p, old_w)
+    return {"type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}
 
-    bonus_log = ""
-    if random.random() < 0.30: # 30% 觸發極品覺醒
-        affix_pool = [("🔥 [ 鋒利 ]", 100), ("🌟 [ 聖魔 ]", 150), ("⚡ [ 疾風 ]", 80)]
-        chosen_affix, extra_atk = random.choice(affix_pool)
-        p["weapon"] = f"{chosen_affix} 的 {recipe['target']}"
-        p["forge_weapon_bonus"] = extra_atk 
-        bonus_log = f"\n\n✨ 🎉 🌟 【 ⚒️ 神匠覺醒・極品出世 ⚒️ 】 🌟 🎉 ✨\n鍛造火爐中天降異象！你完美觸發了 30% 頂級匠人神力，成功打磨出極品前綴：【 {chosen_affix} 】！\n📈 武器戰力突破：額外物傷加乘爆裂跳躍 ── 【 💥 +{extra_atk} 點 】！"
-    else:
-        p["weapon"] = recipe["target"]
-        p["forge_weapon_bonus"] = 0 
+def execute_forge_weapon(p, cmd_str):
+    """⚒️ 核心熔煉大腦：扣除金幣與包包素材，博弈概率洗鍊隨機品質裝備"""
+    blueprint = cmd_str.replace("鍛造", "").replace(" ", "").strip()
+    if blueprint not in FORGE_RECIPES:
+        return "❌ 打造失敗！遠古工坊中沒有記載該裝備的神聖圖紙配方。"
         
+    recipe = FORGE_RECIPES[blueprint]
+    
+    # 1. 檢查金幣
+    if p["gold"] < recipe["gold"]:
+        return f"❌ 打造失敗！🪙 資金不足！打造【{blueprint}】需要 {recipe['gold']} 金幣，你目前只有 {p['gold']} 金幣。"
+        
+    # 2. 檢查背包素材數量 (從 p 的 inventory 字典比對)
+    inv = p.get("inventory", {})
+    if isinstance(inv, str):
+        try: inv = json.loads(inv)
+        except: inv = {}
+        
+    current_mat_qty = inv.get(recipe["mat"], 0)
+    if current_mat_qty < recipe["mat_qty"]:
+        return f"❌ 打造失敗！🛠️ 鍛造素材不足！你需要【{recipe['mat']}】x{recipe['mat_qty']}，但你目前只有 {current_mat_qty} 個。"
+        
+    # 3. 扣除代價
+    p["gold"] -= recipe["gold"]
+    inv[recipe["mat"]] = current_mat_qty - recipe["recipe_mat_qty"] if "recipe_mat_qty" in recipe else current_mat_qty - recipe["mat_qty"]
+    p["inventory"] = json.dumps(inv, ensure_ascii=False)
+    
+    # 4. 機率洗鍊裝備品質 (手工鍛造有高達 10% 的高機率直接爆出「史詩」或「遠古神話」品質！)
+    rolled_rarity = random.choices(
+        ["⭐普通", "🔷魔法", "🌟稀有", "🔥史詩", "👑遠古神話"],
+        weights=[25, 40, 25, 8, 2], k=1
+    )[0]
+    
+    # 生成對應部位的動態暗黑屬性裝備封包
+    new_eq = equipment_core.generate_random_equipment(recipe["slot"], recipe["base"], forced_rarity=rolled_rarity)
+    # 修改裝備名稱使其符合圖紙名稱
+    new_eq["name"] = new_eq["name"].replace(recipe["base"], blueprint)
+    
+    # 5. 安全塞入備用裝備包
+    from dynamic_market import _add_to_equipment_inventory
+    _add_to_equipment_inventory(p, new_eq)
+    
     db_core.save_player(p)
-    reply_text = f"🔨 🔥 ✨ 【遠古神兵 熔煉大成功】 ✨ 🔥 🔨\n恭喜你成功打造出了全新神裝 ── ⚔️【{p['weapon']}】！{bonus_log}\n\n已全自動為你披掛上身！快點擊底部【我的裝備】查看新面板！"
-    card = db_core.make_battle_card(reply_text, p, None)
-    return {"flex": card["flex"], "quick_reply": qr_object}
-
-def get_equipment_card(p):
-    """🛡️ 【真・防彈過審版】優化裝備卡片生成，徹底消滅單行 if 三元運算子錯誤"""
-    current_weapon = p.get("weapon", "赤手空拳")
-    pure_w_name = current_weapon.split(" 的 ")[-1] if " 的 " in current_weapon else current_weapon
-    w_bonus = weapons.SHOP_WEAPONS[pure_w_name]["atk_bonus"] if pure_w_name in weapons.SHOP_WEAPONS else 0
-    forge_bonus = int(p.get("forge_weapon_bonus", 0))
-    total_atk = w_bonus + forge_bonus
     
-    w_desc = weapons.SHOP_WEAPONS[pure_w_name]["desc"] if pure_w_name in weapons.SHOP_WEAPONS else "赤手空拳，毫無攻擊力加成。"
-    
-    # 建立主手武器核心卡片內容
-    slot_contents = [
-        {"type": "text", "text": "⚔️ 主手武器 (Main-Hand Weapon)", "size": "xs", "color": "#007AFF", "weight": "bold"},
-        {"type": "text", "text": f"【 {current_weapon} 】", "size": "md", "color": "#4CD964", "weight": "bold", "marginTop": "xs"},
-        {"type": "text", "text": f"💥 實體物理傷害總增幅：+{total_atk} 點", "size": "xs", "color": "#FF9500", "margin": "xs"}
-    ]
-    
-    # ✨ 【語法終極導正】改用標準 if 語句動態附加行數，徹底封印 SyntaxError 逗號地雷！
-    if forge_bonus > 0:
-        slot_contents.append({"type": "text", "text": f"   ↳ (其中內含工坊神匠覺醒：+{forge_bonus} 點)", "size": "xs", "color": "#FFCC00"})
-        
-    slot_contents.append({"type": "text", "text": f"📖 兵器神話：{w_desc}", "size": "xs", "color": "#8E8E93", "margin": "xs", "wrap": True})
-    
-    contents = [
-        {"type": "text", "text": "🛡️ 勇者神聖裝備欄面板", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-        {"type": "separator", "margin": "sm", "color": "#333333"},
-        {
-            "type": "box", 
-            "layout": "vertical", 
-            "margin": "md", 
-            "backgroundColor": "#2C2C2E", 
-            "paddingAll": "sm", 
-            "cornerRadius": "md",
-            "contents": slot_contents
-        }
-    ]
-    
-    quick_items = [
-        QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")),
-        QuickReplyItem(action=MessageAction(label="⚒️ 鍛造工坊", text="工坊")),
-        QuickReplyItem(action=MessageAction(label="🏃 返回世界尋怪", text="尋怪"))
-    ]
-    qr_object = QuickReply(items=quick_items)
-    
-    if current_weapon != "赤手空拳":
-        contents.append({"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "marginTop": "sm", "action": {"type": "message", "label": "❌ 卸下裝備放回背包", "text": "脫下裝備"}})
-        
-    return {"flex": {"type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}, "quick_reply": qr_object}
-
-def execute_unequip_weapon(p):
-    current_weapon = p.get("weapon", "赤手空拳")
-    if current_weapon == "赤手空拳": return "❌ 脫除失敗！你目前本來就赤手空拳。"
-    add_to_weapon_inventory(p, current_weapon)
-    p["weapon"] = "赤手空拳"
-    p["forge_weapon_bonus"] = 0 
-    db_core.save_player(p)
-    return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器 ── ⚔️【{current_weapon}】安全解下！已完整存入您的武器背包欄！"
-
-def add_to_weapon_inventory(p, w_name):
-    w_inv_str = p.get("weapon_inventory", "{}")
-    if w_inv_str is None or w_inv_str == "None" or w_inv_str == "": w_inv_str = "{}"
-    try: w_dict = json.loads(w_inv_str)
-    except Exception: w_dict = {}
-    w_dict[w_name] = w_dict.get(w_name, 0) + 1
-    p["weapon_inventory"] = json.dumps(w_dict, ensure_ascii=False)
+    return f"⚒️ 🔥 【 工坊熔煉天啟大成功 】 🔥 ⚒️\n───────────────────\n鐵匠揮舞重錘，熔岩鐵水四濺！你投入的素材在法陣中完美凝聚！\n\n🔨 成功打造：{new_eq['name']} ({recipe['slot']})！\n✨ 品質天啟：成功洗鍊出 ── 【{rolled_rarity}】階級！\n📦 存放去向：神兵利器已全自動送入【我的裝備包】，快去穿戴享受暴漲的白字屬性加成吧！"
