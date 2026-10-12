@@ -4,12 +4,11 @@ import jobs
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
 def get_status_card(p):
-    """👤 【狀態面板 3.0 極簡傳奇版】移除波動範圍、拿掉贅餘標題、完美解決經驗吃字"""
+    """👤 生成高質感 4 層橫向網格狀態面板 (自帶導航回圈)"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
     
-    # 🌟 1. 核心基礎六圍計算
     str_val = int(p.get("strength", 10 + (level * 3)) * job_mod["str_mod"])
     agi_val = int(p.get("agility", 10 + (level * 2)) * job_mod["agi_mod"])
     int_val = int(p.get("intelligence", 10 + (level * 2)) * job_mod["int_mod"])
@@ -18,7 +17,6 @@ def get_status_card(p):
     men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
     free_pts = p.get("attribute_points", 0)
     
-    # 🌟 2. 攻防進階與上限衍生計算 (依需求：內部保留波動計算，面板只顯示最大單一數字)
     w_bonus = weapons.SHOP_WEAPONS[p["weapon"]]["atk_bonus"] if p["weapon"] in weapons.SHOP_WEAPONS else 0
     p_atk_single = 12 + str_val + w_bonus
     m_atk_single = 10 + int_val
@@ -47,8 +45,6 @@ def get_status_card(p):
             "contents": [
                 {"type": "text", "text": f"👤 勇者狀態面板 (Lv.{level})", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
                 {"type": "separator", "color": "#333333"},
-                
-                # 📜 基礎大狀態展示區 (✨ 經驗值優化：切分至單獨下一行，徹底解決吃字問題)
                 {"type": "box", "layout": "vertical", "spacing": "xs", "contents": [
                     {"type": "text", "text": f"🎭 目前職業：🔥【{current_job}】", "size": "sm", "color": "#007AFF", "weight": "bold"},
                     {"type": "text", "text": f"💰 擁有金幣：🪙 {p['gold']}", "size": "sm", "color": "#FFD700"},
@@ -56,8 +52,6 @@ def get_status_card(p):
                     {"type": "text", "text": f"✨ 剩餘潛能點數：{free_pts} 點", "size": "sm", "color": status_color, "weight": "bold"}
                 ]},
                 {"type": "separator", "color": "#333333"},
-                
-                # ⚔️ 欄位一：角色素質 (✨ 依需求：更名為【 角色素質 】)
                 {"type": "text", "text": "🧬 【 角色素質 】", "weight": "bold", "size": "xs", "color": "#8E8E93"},
                 {"type": "box", "layout": "horizontal", "contents": [
                     {"type": "text", "text": f"💪 力量: {str_val}", "size": "xs", "color": "#FFFFFF", "flex": 1},
@@ -70,8 +64,6 @@ def get_status_card(p):
                     {"type": "text", "text": f"🌟 精神: {men_val}", "size": "xs", "color": "#FFFFFF", "flex": 1}
                 ]},
                 {"type": "separator", "color": "#222222", "margin": "sm"},
-                
-                # ⚔️ 欄位二：攻防數值欄 (✨ 依需求：拔除「戰術攻防進階值」字串，改用單一數字展示)
                 {"type": "box", "layout": "horizontal", "contents": [
                     {"type": "text", "text": f"💥 物傷: {p_atk_single}", "size": "xs", "color": "#FF9500", "flex": 1},
                     {"type": "text", "text": f"🔮 魔傷: {m_atk_single}", "size": "xs", "color": "#5AC8FA", "flex": 1}
@@ -81,15 +73,11 @@ def get_status_card(p):
                     {"type": "text", "text": f"🌀 法防: {m_def}", "size": "xs", "color": "#AF52DE", "flex": 1}
                 ]},
                 {"type": "separator", "color": "#222222", "margin": "sm"},
-                
-                # ⚔️ 欄位三：戰術機率欄 (✨ 依需求：拔除「戰場觸發修正率」字串)
                 {"type": "box", "layout": "horizontal", "contents": [
                     {"type": "text", "text": f"💨 連擊率: {double_chance}%", "size": "xs", "color": "#E0E0E0", "flex": 1},
                     {"type": "text", "text": f"✨ 爆擊率: {crit_chance}%", "size": "xs", "color": "#FFCC00", "weight": "bold", "flex": 1}
                 ]},
                 {"type": "separator", "color": "#222222", "margin": "sm"},
-                
-                # ⚔️ 欄位四：血量魔力上限欄 (✨ 依需求：拔除「當前狀態精準值」字串)
                 {"type": "box", "layout": "horizontal", "contents": [
                     {"type": "text", "text": f"💖 血量: {p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#4CD964", "flex": 1},
                     {"type": "text", "text": f"🔷 魔力: {current_mp} / {calculated_max_mp}", "size": "xs", "color": "#007AFF", "flex": 1}
@@ -111,3 +99,36 @@ def get_status_card(p):
         QuickReplyItem(action=MessageAction(label="🦅 返回城鎮", text="回城"))
     ]
     return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items)}
+
+def handle_resurrect(p):
+    """😇 【復活大腦重構】全面升級為一體化 Dict 智慧組合包，全自動清洗狀態與重設主城小標籤"""
+    if p["hp"] > 0:
+        # 如果玩家根本沒死，回傳提示
+        card = db_core.make_battle_card("💡 提示：勇者！你目前明明生命值健全，不需要使用復活神術。", p, None)
+        return {"flex": card["flex"], "quick_reply": card["quick_reply"]}
+        
+    import jobs
+    level = p.get("level", 1)
+    current_job = p.get("job", "初心者")
+    job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
+    
+    str_val = int(p.get("strength", 10 + (level * 3)) * job_mod["str_mod"])
+    vit_val = int(p.get("vitality", 10 + (level * 3)) * job_mod["vit_mod"])
+    men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
+    
+    max_hp = 100 + (vit_val * 5) + (level * 15)
+    max_mp = 50 + (men_val * 4) + (level * 5)
+    
+    # ✨ 核心復活數值改寫：血量與魔力全數充滿！並全自動傳送回「主城」安全區
+    p["hp"] = max_hp
+    p["mp"] = max_mp
+    p["current_map"] = "主城"
+    p["enemy"] = None
+    p["gold"] = max(0, p["gold"] - 20) # 死亡小扣罰 20 金幣
+    db_core.save_player(p)
+    
+    log_text = f"😇 ✨ 👼 【 神聖天使・復活術成功 】 👼 ✨ 😇\n─────────────────\n世界樹的讚美詩響起！璀璨的光明法陣在虛空中張開，你被泉水聖光溫柔包覆！\n\n💖 狀態恢復：生命值與魔力值全數充滿爆表 ── 【 🟢 FULL HP/MP 】！\n🏙️ 時空轉移：靈魂已安穩重塑於皇家安全起點 ── 📍【 主城 】！\n🪙 公會稅收：修復靈魂扣除工本費 20 金幣。"
+    
+    # 呼叫 db_core 生成主城限定的實體 Quick Reply 選單 (簽到、工坊、爬塔、Boss直達鈕)
+    card = db_core.make_battle_card(log_text, p, None)
+    return {"flex": card["flex"], "quick_reply": card["quick_reply"]}
