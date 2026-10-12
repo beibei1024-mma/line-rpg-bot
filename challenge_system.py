@@ -8,8 +8,8 @@ import db_core
 def get_challenge_menu(p):
     """⚔️ 生成世界 Boss 與深淵試煉塔的 Flex 選單"""
     # 讀取全服 Boss 殘餘血量與目前排行（保底防爆）
-    boss_hp = db_core.load_global_value("world_boss_hp", 5000000)
-    boss_max = 5000000
+    boss_hp = db_core.load_global_value("world_boss_hp", 50000)
+    boss_max = 50000
     
     contents = [
         {"type": "text", "text": "🏆 皇家遠古烈焰試煉挑戰場", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
