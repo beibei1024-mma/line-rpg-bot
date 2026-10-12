@@ -1,11 +1,11 @@
-# player.py - 勇者皇家私人物資與狀態控制中心 (Flex 防截斷排版修復版)
+# player.py - 勇者皇家私人物資與狀態控制中心 (高階實戰四維白字版)
 
 import db_core
 import jobs
 import json
 
 def get_status_card(p):
-    """👤 生成完全體防截斷、不字體外流的網格化勇者狀態面板"""
+    """👤 生成完全體防截斷、不字體外流的四維硬核戰力狀態面板"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -20,7 +20,7 @@ def get_status_card(p):
     b_men = p.get("sprit", 10)
 
     str_val = int(b_str * job_mod["str_mod"])
-    agi_val = int(b_agi * job_mod["agi_mod"])
+    agi_val = int(b_agi * job_mod.get("agi_mod", 1.0))
     int_val = int(b_int * job_mod["int_mod"])
     vit_val = int(b_vit * job_mod["vit_mod"])
     luk_val = int(b_luk * job_mod["luk_mod"])
@@ -31,9 +31,10 @@ def get_status_card(p):
     try: equipped = json.loads(eq_slots_str)
     except: equipped = {}
     
-    eq_atk = 0
+    eq_atk, eq_def = 0, 0
     for slot, eq in equipped.items():
         eq_atk += eq.get("atk", 0)
+        eq_def += eq.get("def", 0)
         str_val += eq.get("affixes", {}).get("strength", 0)
         agi_val += eq.get("affixes", {}).get("agility", 0)
         int_val += eq.get("affixes", {}).get("intelligence", 0)
@@ -41,51 +42,47 @@ def get_status_card(p):
         luk_val += eq.get("affixes", {}).get("luck", 0)
         men_val += eq.get("affixes", {}).get("sprit", 0)
 
+    # 🧮 3. 精算四大實戰高階隱藏白字屬性 (對齊 battle_core 核心運算公式)
+    phys_atk = 12 + str_val + eq_atk
+    magic_atk = 10 + int_val
+    double_chance = min(60.0, 2.0 + (agi_val / 600.0) * 100.0) # 轉換為百分比展示
+    crit_chance = min(80.0, 10.0 + (luk_val / 500.0) * 100.0)   # 轉換為百分比展示
+
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
-    
     current_weapon = p.get("weapon", "赤手空拳")
 
     contents = [
         {"type": "text", "text": f"👤 勇者：[ {p['user_id'][:8]} ]", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
         {"type": "text", "text": f"✨ 信仰：{current_job} (T{job_mod['tier']})", "size": "sm", "color": "#34AADC", "align": "center"},
         {"type": "separator", "margin": "sm", "color": "#333333"},
-        {"type": "text", "text": f"📊 等級：Lv.{level} (EXP: {p['exp']}/{level*50})", "size": "xs", "color": "#E0E0E0"},
+        {"type": "text", "text": f"📊 等級：Lv.{level} (EXP: {p['exp']} / {level * 50})", "size": "xs", "color": "#E0E0E0"},
         {"type": "text", "text": f"🩸 血量：{p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#4CD964"},
         {"type": "text", "text": f"🔷 魔力：{p.get('mp', calculated_max_mp)} / {calculated_max_mp}", "size": "xs", "color": "#007AFF"},
-        {"type": "text", "text": f"🪙 流動資產：{p['gold']} 金幣", "size": "xs", "color": "#FFCC00"},
-        {"type": "text", "text": f"⚔️ 武器：{current_weapon} (總裝備物傷 +{eq_atk})", "size": "xs", "color": "#FF9500"},
-        {"type": "text", "text": f"📍 座標：【 {p.get('current_map', '主城')} 】", "size": "xs", "color": "#AF52DE"},
+        {"type": "text", "text": f"🪙 資產：{p['gold']} 金幣", "size": "xs", "color": "#FFCC00"},
+        {"type": "text", "text": f"📍 座標：📍【 {p.get('current_map', '主城')} 】", "size": "xs", "color": "#AF52DE"},
         {"type": "separator", "margin": "md", "color": "#333333"},
-        {"type": "text", "text": f"💪 潛能點分配 (剩餘可點數：{p.get('attribute_points', 0)} 點)", "weight": "bold", "size": "xs", "color": "#FFCC00", "margin": "xs"}
-    ]
-
-    # 🛠️ 重新設計防爆、防擠壓的兩列三行垂直緊湊網格佈局
-    attrs = [
-        ("力量", str_val, "加點力量 1"), ("敏捷", agi_val, "加點敏捷 1"),
-        ("智力", int_val, "加點智力 1"), ("體力", vit_val, "加點體力 1"),
-        ("幸運", luk_val, "加點幸運 1"), ("精神", men_val, "加點精神 1")
-    ]
-    
-    for i in range(0, len(attrs), 2):
-        name1, val1, cmd1 = attrs[i]
-        name2, val2, cmd2 = attrs[i+1]
         
-        contents.append({
-            "type": "box", "layout": "horizontal", "margin": "md", "spacing": "sm",
-            "contents": [
-                # 左半邊屬性單元格
-                {"type": "box", "layout": "vertical", "flex": 1, "contents": [
-                    {"type": "text", "text": f"🔸{name1}: {val1}", "size": "xs", "color": "#E0E0E0", "gravity": "center"},
-                    {"type": "button", "style": "primary", "color": "#2C2C2E", "height": "sm", "margin": "xs", "action": {"type": "message", "label": "➕分配 1", "text": cmd1}}
-                ]},
-                # 右半邊屬性單元格
-                {"type": "box", "layout": "vertical", "flex": 1, "contents": [
-                    {"type": "text", "text": f"🔸{name2}: {val2}", "size": "xs", "color": "#E0E0E0", "gravity": "center"},
-                    {"type": "button", "style": "primary", "color": "#2C2C2E", "height": "sm", "margin": "xs", "action": {"type": "message", "label": "➕分配 1", "text": cmd2}}
-                ]}
-            ]
-        })
+        # 🔥 全新高階實戰面版展示區
+        {"type": "text", "text": "⚔️ 【 皇家高階核心戰力屬性 】", "weight": "bold", "size": "xs", "color": "#FF9500"},
+        {"type": "box", "layout": "horizontal", "margin": "sm", "contents": [
+            {"type": "text", "text": f"💥 物理攻擊: {phys_atk}", "size": "xs", "color": "#FF3B30", "flex": 1},
+            {"type": "text", "text": f"🔮 魔法攻擊: {magic_atk}", "size": "xs", "color": "#AF52DE", "flex": 1}
+        ]},
+        {"type": "box", "layout": "horizontal", "margin": "xs", "contents": [
+            {"type": "text", "text": f"⚡ 連擊機率: {double_chance:.1f}%", "size": "xs", "color": "#34AADC", "flex": 1},
+            {"type": "text", "text": f"💥 暴擊機率: {crit_chance:.1f}%", "size": "xs", "color": "#4CD964", "flex": 1}
+        ]},
+        {"type": "text", "text": f"🛡️ 物理防禦: +{eq_def} (附加加成)", "size": "xs", "color": "#E0E0E0", "margin": "xs"},
+        
+        {"type": "separator", "margin": "md", "color": "#333333"},
+        {"type": "text", "text": "💪 【 六大遠古天賦基本屬性 】", "weight": "bold", "size": "xs", "color": "#FFCC00"},
+        {"type": "box", "layout": "horizontal", "margin": "sm", "contents": [
+            {"type": "text", "text": f"🔸力量: {str_val} | 🔸敏捷: {agi_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
+            {"type": "text", "text": f"🔸智力: {int_val} | 🔸體力: {vit_val}", "size": "xs", "color": "#E0E0E0", "flex": 1}
+        ]},
+        {"type": "text", "text": f"🔸幸運: {luk_val} | 🔸精神: {men_val}  (剩餘潛能點: {p.get('attribute_points', 0)} 點)", "size": "xs", "color": "#E0E0E0", "margin": "xs"}
+    ]
 
     flex_bubble = {
         "type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}},
