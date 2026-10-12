@@ -1,4 +1,4 @@
-# game_core.py (優化版)
+# game_core.py (優化完全體 - 第一部分)
 import db_core
 import player
 import shop
@@ -102,7 +102,6 @@ def process_game_logic(event, line_bot_api, configuration):
         return "OK"
         
     if user_msg == "脫下裝備":
-        # ✨ 【Bug 修正】確保調用完 LINE API 後，回傳符合 Flask 路由規範的字串
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
         return "OK"
 
@@ -130,9 +129,7 @@ def process_game_logic(event, line_bot_api, configuration):
     if is_city_cmd and current_loc != "主城":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 鎖定限制！你目前位於野外【{current_loc}】。請先輸入【回城】！"))
         return "OK"
-
-    # 主城內功能
-    if current_loc == "主城":
+        # （此處承接主城內的「冒險商店、購買、簽到」等功能分支）
         if user_msg == "冒險商店":
             line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟商店", contents=shop.get_shop_card(p)))
             return "OK"
@@ -170,57 +167,28 @@ def process_game_logic(event, line_bot_api, configuration):
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
             with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return "OK"
-    if user_msg in ["鍛造工坊", "鍛造", "工坊"]:
-        card_data = forge_system.get_forge_menu(p)
-        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-    # （此處承接主城內的「工坊/鍛造」選單發送之後...）
-    with ApiClient(configuration) as api_client: 
-        MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-    return "OK"
-
-        # ✨ 精準收容與校正縮排後的第二部分程式碼
         if user_msg in ["鍛造工坊", "鍛造", "工坊"]:
             card_data = forge_system.get_forge_menu(p)
-            msg_payload = {
-                "replyToken": event.reply_token, 
-                "messages": [{
-                    "type": "flex", 
-                    "altText": "鍛造工坊", 
-                    "contents": card_data["flex"], 
-                    "quickReply": card_data["quick_reply"]
-                }]
-            }
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+            with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return "OK"
-
         if user_msg.startswith("鍛造"):
             res = forge_system.execute_forge_weapon(p, user_msg)
             if isinstance(res, str): 
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
             else:
-                msg_payload = {
-                    "replyToken": event.reply_token, 
-                    "messages": [{
-                        "type": "flex", 
-                        "altText": "工坊熔煉結果", 
-                        "contents": res["flex"], 
-                        "quickReply": res["quick_reply"]
-                    }]
-                }
-                with ApiClient(configuration) as api_client: 
-                    MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+                msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "工坊熔煉結果", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
+                with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return "OK"
-
         if user_msg in ["尋找怪物", "尋怪", "攻擊", "使用技能"]:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
             return "OK"
 
-    # 🌲 處於野外危險區的指令導流（跳出主城 if 區塊，與 current_loc 平級，保持 4 空格齊頭）
+    # 🌲 野外危險區指令導流（跳出主城 if 區塊，保持 4 空格齊頭）
     if user_msg.startswith("轉職"):
         jobs_system.handle_job_transfer(event, line_bot_api, p, user_msg, configuration)
         return "OK"
-        
-    # 🕹️ 預設交給戰鬥核心處理（尋怪、攻擊、逃跑，保持 4 空格齊頭）
+    
+    # 預設交給戰鬥核心處理
     battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
     return "OK"
