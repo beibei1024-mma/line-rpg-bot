@@ -10,7 +10,7 @@ CONSUMABLES = {
 }
 
 def get_bag_card(p):
-    """🎒 生成網格化勇者私人物資倉庫卡片 (全新解鎖裝備收藏庫與換裝引導)"""
+    """🎒 生成網格化勇者私人物資倉庫卡片 (全面視覺化武器素質欄與一鍵穿戴熱鍵)"""
     if "inventory" not in p or not p["inventory"]:
         p["inventory"] = {"items": {}, "materials": {}}
         
@@ -21,7 +21,7 @@ def get_bag_card(p):
     items = inv.get("items", {})
     materials = inv.get("materials", {})
     
-    # ✨ 讀取玩家儲存在 weapon_inventory 裡的備用武器包
+    # 讀取玩家儲存在 weapon_inventory 裡的備用武器包
     w_inv_str = p.get("weapon_inventory", "{}")
     if w_inv_str is None or w_inv_str == "None" or w_inv_str == "": w_inv_str = "{}"
     try: 
@@ -35,25 +35,37 @@ def get_bag_card(p):
         {"type": "separator", "margin": "md", "color": "#333333"}
     ]
     
-    # 🌟 1. 全新解鎖：【 ⚔️ 裝備與兵器收藏庫 】網格欄位
+    # 🌟 1. 核心優化：【 ⚔️ 裝備與兵器收藏庫 】視覺化網格圖卡化展示
     contents.append({"type": "text", "text": "⚔️ 【 裝備與兵器收藏庫 】", "weight": "bold", "size": "sm", "color": "#007AFF", "margin": "md"})
     
-    # 過濾清除無效的空資料
     active_weapons = {k: v for k, v in weapons_held.items() if v > 0}
     if not active_weapons:
         contents.append({"type": "text", "text": "   (您的裝備背包空空如也，快去商店或野外打寶！)", "size": "xs", "color": "#8E8E93"})
     else:
+        # ✨ 【UI/UX 大革新】疊代包包裡擁有的每把武器，實體列出素質、並直接上架「一鍵裝備」按鈕！
         for w_name, count in active_weapons.items():
+            # 自動從 weapons.py 提取對應武器的攻擊力數值與敘述（清除詞綴前綴防呆）
+            pure_w_name = w_name.split(" 的 ")[-1] if " 的 " in w_name else w_name
+            w_info = weapons.SHOP_WEAPONS.get(pure_w_name, {"atk_bonus": 0, "desc": "未知神秘兵器。"})
+            
             contents.append({
-                "type": "box", "layout": "horizontal", "margin": "xs",
+                "type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
                 "contents": [
-                    {"type": "text", "text": f"🗡️ {w_name}", "size": "xs", "color": "#E0E0E0", "flex": 4},
-                    {"type": "text", "text": f"x{count}", "size": "xs", "color": "#34AADC", "align": "end", "flex": 1}
+                    {"type": "box", "layout": "horizontal", "contents": [
+                        {"type": "text", "text": f"🗡️ {w_name}", "size": "sm", "color": "#FF9500", "weight": "bold", "flex": 4},
+                        {"type": "text", "text": f"擁有: {count} 把", "size": "xs", "color": "#34AADC", "align": "end", "flex": 2}
+                    ]},
+                    # ✨ 實體顯示武器裝備的傷害素質！
+                    {"type": "text", "text": f"💥 物理傷害加成：+{w_info['atk_bonus']} 點", "size": "xs", "color": "#4CD964", "margin": "xs", "weight": "bold"},
+                    {"type": "text", "text": f"📖 兵器神話：{w_info['desc']}", "size": "xs", "color": "#8E8E93", "margin": "xs", "wrap": True},
+                    # ✨ 實體「一鍵穿戴」快捷點擊按鈕，點擊秒換裝！
+                    {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "marginTop": "sm",
+                     "action": {"type": "message", "label": "⚔️ 立即裝備上身", "text": f"裝備 {w_name}"}}
                 ]
             })
             
     # 2. 渲染消耗品
-    contents.append({"type": "text", "text": "🧪 【 藥水與補給物資 】", "weight": "bold", "size": "sm", "color": "#FF9500", "margin": "md"})
+    contents.append({"type": "text", "text": "🧪 【 藥水與補給物資 】", "weight": "bold", "size": "sm", "color": "#FF9500", "margin": "lg"})
     if not items:
         contents.append({"type": "text", "text": "   (消耗品倉庫目前空空如也)", "size": "xs", "color": "#8E8E93"})
     else:
@@ -86,8 +98,7 @@ def get_bag_card(p):
         "body": {"type": "box", "layout": "vertical", "spacing": "xs", "contents": contents},
         "footer": {
             "type": "box", "layout": "vertical",
-            # ✨ 【UX 大升級】在底部加入「裝備口令」的雙重智慧提示！
-            "contents": [{"type": "text", "text": "✍️ 換裝口令：輸入【裝備 武器名稱】(例如：裝備 新手鐵短劍)\n🧪 補血口令：輸入【使用 藥水名稱】(例如：使用 初級生命藥水)", "size": "xs", "color": "#8E8E93", "align": "center", "wrap": True}]
+            "contents": [{"type": "text", "text": "💡 提示：點擊上方兵器格子內的【⚔️ 立即裝備上身】按鈕，鐵匠鋪將全自動為您調度武裝！換下來的舊武器會安全移回包包中。", "size": "xs", "color": "#8E8E93", "align": "center", "wrap": True}]
         }
     }
 
@@ -100,7 +111,7 @@ def get_bag_card(p):
     return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items)}
 
 def equip_weapon_from_bag(p, user_cmd):
-    """⚔️ 🤖 全新一鍵換裝大腦：從背包中提取兵器裝備上身，並把舊武器丟回收藏庫"""
+    """⚔️ 🤖 一鍵換裝大腦"""
     w_name = user_cmd.replace("裝備", "").replace("穿上", "").replace(" ", "").strip()
     
     w_inv_str = p.get("weapon_inventory", "{}")
@@ -113,27 +124,22 @@ def equip_weapon_from_bag(p, user_cmd):
     if w_dict.get(w_name, 0) <= 0:
         return f"❌ 換裝失敗！您的【裝備收藏庫】中目前沒有庫存【{w_name}】這把武器！"
         
-    # 1. 扣除背包裡要穿上的武器數量 1 把
     w_dict[w_name] -= 1
     if w_dict[w_name] == 0: 
         del w_dict[w_name]
         
-    # 2. 將原本手上的舊武器，安全存入背包收藏庫
     old_w = p.get("weapon", "赤手空拳")
     if old_w != "赤手空拳":
         w_dict[old_w] = w_dict.get(old_w, 0) + 1
         
-    # 3. 回存資料庫，並重置測試字首加成
     p["weapon_inventory"] = json.dumps(w_dict, ensure_ascii=False)
     p["weapon"] = w_name
-    # 如果穿上的是不含詞綴的乾淨商店現貨，歸零附加白字；如果是極品打造裝，保留原有詞綴加乘
     if " 的 " not in w_name:
         p["forge_weapon_bonus"] = 0
         
     db_core.save_player(p)
-    return f"⚔️ 🔥 【 皇家更換裝備成功 】 🔥 ⚔️\n─────────────────\n你打開了兵器私藏庫，將全新兵器 ── ⚔️【{w_name}】拔出披掛上身！\n\n🔄 去向：換下來的舊武裝【{old_w}】已全自動送入背包收藏庫！\n💡 提示：輸入【我的狀態】或【裝備】即可查看全新暴漲的戰力數據面板！"
+    return f"⚔️ 🔥 【 皇家更換裝備成功 】 🔥 ⚔️\n─────────────────\n你成功將私藏庫的 ── ⚔️【{w_name}】拔出披掛上身！\n\n🔄 換下來的舊武裝【{old_w}】已安全送回背包收藏庫！"
 
-# (以下維護藥水與素材基礎功能不變)
 def add_to_inventory(p, item_name, is_material=False):
     if "inventory" not in p or not p["inventory"]: p["inventory"] = {"items": {}, "materials": {}}
     inv = p["inventory"]
@@ -157,7 +163,7 @@ def use_potion(p, potion_name):
     if p["hp"] >= max_hp: return "💚 生命值已滿，不需浪費藥水！"
     if potion_name not in CONSUMABLES: return "❌ 非可食用的藥水。"
     config = CONSUMABLES[potion_name]
-    heal_amount = random.randint(config["heal_range"][0], config["heal_range"][1])
+    heal_amount = random.randint(config["heal_range"], config["heal_range"])
     old_hp = p["hp"]
     p["hp"] = min(max_hp, p["hp"] + heal_amount)
     items[potion_name] -= 1
