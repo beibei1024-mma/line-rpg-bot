@@ -1,4 +1,4 @@
-# battle_core.py - 皇家戰鬥計算機 v5.0 (語法死鎖終極修復完全體)
+# battle_core.py - 皇家戰鬥計算機 v5.5 (語法死鎖終極修復完全體)
 
 import random
 import json
@@ -46,7 +46,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
     if p.get("mp") is None or p["mp"] == "None" or str(p["mp"]).strip() == "": p["mp"] = calculated_max_mp
     p["mp"] = int(p["mp"])
 
-    # ── 🔍 2. 尋找怪物核心分支 ──
+    # ── 👑 終極一體化一連串指令判斷鏈 ──
     if user_msg in ["尋找怪物", "尋怪"]:
         if p.get("enemy") is not None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚔️ 眼前還有怪物！請發動【攻擊】或施放職業技能！"))
@@ -62,7 +62,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # ── ⚔️ 3. 普通物理揮刀與戰術防禦核心分支 ──
     elif user_msg in ["攻擊", "使用技能防禦", "技能防禦"]:
         if p.get("enemy") is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 周圍沒有怪物，請先點擊【尋怪】！"))
@@ -77,15 +76,12 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             log += "🛡️ 戰術防禦！本回合防禦力暴增 3 倍，準備迎擊反擊！\n"
             total_p_dmg = 0
         else:
-            # 普通物理砍擊公式
             total_p_dmg = random.randint(5 + (str_val // 2) + eq_atk, 12 + str_val + eq_atk)
             log += f"⚔️ 揮刀命中，對【{enemy['name']}】造成 {total_p_dmg} 點物理傷害！\n"
 
-        # 動態轉入下方的共同反擊與勝負清算管線
         _execute_battle_resolution(event, line_bot_api, p, enemy, log, total_p_dmg, p_defense_multiplier, vit_val, calculated_max_mp, eq_def, current_job, calculated_max_hp, configuration)
         return
 
-    # ── 🔮 4. 【Bug 完美校正點】主動技能施放核心分支，完美對齊外層 elif 層級！ ──
     elif user_msg.startswith("使用技能"):
         if p.get("enemy") is None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 周圍沒有怪物，無法施放技能！"))
@@ -107,31 +103,27 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         log += f"🔮 奧義發動！你消耗了 🔷 {mp_cost} 點 MP 施放秘術 ── ⚡【{skill_name}】！\n"
         base_weapon_atk = 12 + str_val + eq_atk
         
-        # 戰士系 / 騎士系 / 魔法師系技能白字核算
+        # 技能傷害公式核算
         if skill_name == "蓄力重擊": total_p_dmg = int(base_weapon_atk * 1.5)
         elif skill_name == "橫掃千軍": total_p_dmg = int(base_weapon_atk * 1.8) + 50
         elif skill_name == "戰吼震懾": total_p_dmg = int(base_weapon_atk * 1.3) + 100
         elif skill_name == "破甲一擊": total_p_dmg = int(base_weapon_atk * 2.2) + 150
         elif skill_name == "盾擊": total_p_dmg = int((12 + vit_val + eq_atk) * 1.4)
-        elif skill_name == "神盛之光" or skill_name == "神聖之光": total_p_dmg = int((10 + int_val) * 1.6) + 40
+        elif skill_name in ["神盛之光", "神聖之光"]: total_p_dmg = int((10 + int_val) * 1.6) + 40
         elif skill_name == "魔能彈": total_p_dmg = int((10 + int_val) * 1.3)
         elif skill_name == "火球術": total_p_dmg = int((10 + int_val) * 2.0) + 60
         else: total_p_dmg = int(base_weapon_atk * 1.2)
         
         log += f"💥 重創命中！技能對【{enemy['name']}】造成了 {total_p_dmg} 點實體傷害！\n"
-        
         _execute_battle_resolution(event, line_bot_api, p, enemy, log, total_p_dmg, 1.0, vit_val, calculated_max_mp, eq_def, current_job, calculated_max_hp, configuration)
         return
-
-    # 🛑 如果不是尋怪或攻擊指令，不予處理直接釋放
     else:
         return
 
 def _execute_battle_resolution(event, line_bot_api, p, enemy, log, total_p_dmg, p_defense_multiplier, vit_val, calculated_max_mp, eq_def, current_job, calculated_max_hp, configuration):
-    """🎉 共同結算中樞：清算怪物 HP、 Tuple 金幣解包、怪物反擊與自動連跳升級"""
+    """🎉 共同結算中樞：清算怪物 HP、Tuple 金幣解包、怪物反擊與自動連跳升級"""
     enemy["hp"] -= total_p_dmg
 
-    # ── 🎉 勝負判定 1：大獲全勝 ──
     if enemy["hp"] <= 0:
         gold_data = enemy.get("gold_range", (10, 50))
         if isinstance(gold_data, (list, tuple)) and len(gold_data) >= 2:
@@ -144,7 +136,7 @@ def _execute_battle_resolution(event, line_bot_api, p, enemy, log, total_p_dmg, 
         p["mp"] = min(calculated_max_mp, p["mp"] + 25) 
         log += f"\n🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy.get('exp', 15)}！\n🔷 調息魔力恢復 +25 點。\n"
         
-        # 🛠️ 連通 player_level_up.py 升級大腦
+        # 🛠️ 連通 player_level_up.py 升級大腦，讓經驗溢出時連跳數級！
         try:
             import player_level_up
             level_up_bonus_msg = player_level_up.check_and_execute_level_up(p)
@@ -158,8 +150,6 @@ def _execute_battle_resolution(event, line_bot_api, p, enemy, log, total_p_dmg, 
         p["enemy"] = None
         db_core.save_player(p)
         card_data = db_core.make_battle_card(log, p, None)
-        
-    # ── 🩹 勝負判定 2：怪物未死發動反擊 ──
     else:
         final_m_atk = random.randint(1, enemy.get("atk", 5))
         p_def = int((vit_val // 2) * p_defense_multiplier) + eq_def
