@@ -176,6 +176,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             gold_mod = p.get("map_gold_mod", 1.0)
             gold_data = enemy["gold_range"]
             
+            # ✨ 【安全索引解包】精準抽離元組或單一整數，徹底封印 TypeError 與金幣吃字
             min_gold = int(gold_data[0]) if isinstance(gold_data, (tuple, list)) else int(gold_data)
             max_gold = int(gold_data[1]) if isinstance(gold_data, (tuple, list)) else int(gold_data)
             final_gold = int(random.randint(min_gold, max_gold) * gold_mod)
@@ -184,104 +185,13 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             p["mp"] = min(calculated_max_mp, p["mp"] + 25) 
             log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力恢復 +25 點。\n"
             
-            if random.random() < 0.05:
-                current_loc = p.get("current_map", "新手村")
-                matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if current_loc[:2] in w_name or (current_loc == "新手村" and "新手" in w_name)]
-                if matched_weapons:
-                    drop_w = random.choice(matched_weapons); old_w = p.get("weapon", "赤手空拳")
-                    if old_w != "赤手空拳": forge_system.add_to_weapon_inventory(p, old_w)
-                    p["weapon"] = drop_w
-                    log += f"💎 🔥 【神裝降臨】！你驚喜搜刮到了專屬神兵：⚔️【{drop_w}】！已全自動換裝！\n"
-
-            raw_monster_name = enemy["name"]
-            if "地獄紅蓮巨龍" in raw_monster_name or "邪神克蘇魯" in raw_monster_name:
-                notice_system.push_world_boss_broadcast(raw_monster_name, configuration)
-                log += f"\n👑 🏆 諸神見證！首殺捷報已推播給全服所有玩家！"
-
-            p["enemy"] = None
-            if random.random() < 0.50 and enemy.get("drop_item"):
-                bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
-                log += f"💎 【幸運掉寶】！素材：【{enemy['drop_item']}】x1！\n"
-                
-            is_job_locked = jobs_system.check_level_lock(p, job_mod)
-            p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
-            db_core.save_player(p)
-            
-            card_data = db_core.make_battle_card(log, p, None)
-            
-            # ✨ 【語法終極導正】改用官方標準 v3 字典發送包，全自動將 QuickReply 解析為 LINE 合規格式！
-            msg_payload = {
-                "replyToken": event.reply_token,
-                "messages": [{
-                    "type": "flex", 
-                    "altText": "戰鬥結束", 
-                    "contents": card_data["flex"], 
-                    "quickReply": card_data["quick_reply"].to_dict() if hasattr(card_data["quick_reply"], "to_dict") else card_data["quick_reply"]
-                }]
-            }
-            if is_job_locked:
-                msg_payload["messages"].append({"type": "text", "text": f"🔒 【天賦界限卡關中】\n勇者！你目前已達到了 Lv.{p['level']} 的天賦瓶頸，必須完成天賦轉職才能繼續獲取經驗！\n\n{jobs.get_job_options_text(p)}"})
-                
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-        else:
-            # ── 6. 怪物殘存與環境反擊 ──
-            env_str = enemy.get("env", "")
-            if "暴雨滂沱" in env_str: vit_val = int(vit_val * 0.8)
-            if "精神污染" in enemy.get("skill", ""): p["mp"] = max(0, p["mp"] - 20); log += f"\n👁️ 🚨 邪神被動【精神污染】！魔力值被吸走 20 點！"
-
-            final_m_atk = random.randint(1, enemy["atk"])
-            p_def = int((vit_val // 2) * p_defense_multiplier)
-            dmg_received = max(1, final_m_atk - p_def)
-            p["hp"] = max(0, p["hp"] - dmg_received)
-            log += f"\n🩹 【{enemy['name']}】發動殘暴反擊！你受到 {dmg_received} 點物理傷害！"
-            
-            if p["hp"] <= 0:
-                p["enemy"] = None; log += "\n💀 你受傷過重陣亡了！請點擊底部【😇 祈求復活】按鈕。"
-                db_core.save_player(p); card_data = db_core.make_battle_card(log, p, None)
-            else:
-                db_core.MEMORY_PLAYERS[event.source.user_id] = p; card_data = db_core.make_battle_card(log, p, enemy)
-                
-            # ✨ 【語法終極導正】改用官方標準 v3 字典發送包，彻底封印 JSON 序列化地雷！
-            msg_payload = {
-                "replyToken": event.reply_token,
-                "messages": [{
-                    "type": "flex", 
-                    "altText": "戰鬥回合", 
-                    "contents": card_data["flex"], 
-                    "quickReply": card_data["quick_reply"].to_dict() if hasattr(card_data["quick_reply"], "to_dict") else card_data["quick_reply"]
-                }]
-            }
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-    else:
-        card_data = db_core.make_battle_card("💡 系統提示：請利用螢幕最下方可以左右橫向滑動的小圖標，直接點擊按鈕來展開您的冒險旅程！", p, None)
-        msg_payload = {
-            "replyToken": event.reply_token,
-            "messages": [{
-                "type": "flex", 
-                "altText": "冒險導引", 
-                "contents": card_data["flex"], 
-                "quickReply": card_data["quick_reply"].to_dict() if hasattr(card_data["quick_reply"], "to_dict") else card_data["quick_reply"]
-            }]
-        }
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-            min_gold = int(gold_data) if isinstance(gold_data, (tuple, list)) else int(gold_data)
-            max_gold = int(gold_data) if isinstance(gold_data, (tuple, list)) else int(gold_data)
-            final_gold = int(random.randint(min_gold, max_gold) * gold_mod)
-            p["gold"] += final_gold; p["exp"] += enemy["exp"]
-            
-            p["mp"] = min(calculated_max_mp, p["mp"] + 25) 
-            log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力恢復 +25 點。\n"
-            
-            # ✨ 【優化機制實裝】5% 驚喜爆裝 100% 拒絕直接上身穿戴！改為全自動送入背包收藏庫，絕不覆蓋原神裝！
+            # 5% 驚喜爆裝機制 (全自動送入背包收藏庫，拒絕直接武裝上身)
             if random.random() < 0.05:
                 current_loc = p.get("current_map", "新手村")
                 matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if current_loc[:2] in w_name or (current_loc == "新手村" and "新手" in w_name)]
                 if matched_weapons:
                     drop_w = random.choice(matched_weapons)
-                    # 🚀 調用工坊背包大腦，精準將打寶產物送入玩家的兵器倉庫網格中
+                    # 🚀 安全調用工坊背包大腦入庫，保持玩家當前手持武器不變
                     forge_system.add_to_weapon_inventory(p, drop_w)
                     log += f"💎 🔥 🗺️ 【神裝降臨・直接入庫】 🗺️ 🔥 💎\n你擊敗魔物搜刮戰場，驚喜搜刮到了該區域的專屬神兵 ── ⚔️【{drop_w}】！\n📦 存放去向：寶物已為您送入【我的背包】裝備收藏庫，快去開包更換吧！\n"
 
@@ -301,6 +211,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             
             card_data = db_core.make_battle_card(log, p, None)
             
+            # ✨ 【v3 發送對齊】回歸標準非同步封裝模型，完美消滅 JSON 序列化物件衝突地雷
             msg_payload = {
                 "replyToken": event.reply_token,
                 "messages": [{
@@ -315,6 +226,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+                
         else:
             # ── 6. 怪物殘存與環境反擊 ──
             env_str = enemy.get("env", "")
@@ -344,7 +256,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             }
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+                
     else:
+        # 🛑 【極致乾淨】唯一的最外層萬能保底入口，彻底清洗掉所有殘留的重複重疊代碼！
         card_data = db_core.make_battle_card("💡 系統提示：請利用螢幕最下方可以左右橫向滑動的小圖標，直接點擊按鈕來展開您的冒險旅程！", p, None)
         msg_payload = {
             "replyToken": event.reply_token,
