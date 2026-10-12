@@ -1,11 +1,11 @@
-# player.py - 勇者皇家私人物資與狀態控制中心 (高階實戰四維白字版)
+# player.py - 勇者皇家私人物資與狀態控制中心 (防截斷防None完全體)
 
 import db_core
 import jobs
 import json
 
 def get_status_card(p):
-    """👤 生成完全體防截斷、不字體外流的四維硬核戰力狀態面板"""
+    """👤 生成 100% 不外流、防資料庫 None 值、硬核戰力四維狀態面板"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -42,15 +42,20 @@ def get_status_card(p):
         luk_val += eq.get("affixes", {}).get("luck", 0)
         men_val += eq.get("affixes", {}).get("sprit", 0)
 
-    # 🧮 3. 精算四大實戰高階隱藏白字屬性 (對齊 battle_core 核心運算公式)
+    # 🧮 3. 精算四大實戰高階白字屬性
     phys_atk = 12 + str_val + eq_atk
     magic_atk = 10 + int_val
-    double_chance = min(60.0, 2.0 + (agi_val / 600.0) * 100.0) # 轉換為百分比展示
-    crit_chance = min(80.0, 10.0 + (luk_val / 500.0) * 100.0)   # 轉換為百分比展示
+    double_chance = min(60.0, 2.0 + (agi_val / 600.0) * 100.0)
+    crit_chance = min(80.0, 10.0 + (luk_val / 500.0) * 100.0)
 
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
     current_weapon = p.get("weapon", "赤手空拳")
+
+    # ✨【💥 魔力 None 核心修復防爆牆】如果抓到後台是 None，在前端強制校正回復最大值，防戰鬥扣減崩潰
+    if p.get("mp") is None or p["mp"] == "None" or str(p["mp"]).strip() == "":
+        p["mp"] = calculated_max_mp
+        db_core.save_player(p) # 順便將正確的數字洗回 Supabase/PostgreSQL
 
     contents = [
         {"type": "text", "text": f"👤 勇者：[ {p['user_id'][:8]} ]", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
@@ -58,30 +63,39 @@ def get_status_card(p):
         {"type": "separator", "margin": "sm", "color": "#333333"},
         {"type": "text", "text": f"📊 等級：Lv.{level} (EXP: {p['exp']} / {level * 50})", "size": "xs", "color": "#E0E0E0"},
         {"type": "text", "text": f"🩸 血量：{p['hp']} / {calculated_max_hp}", "size": "xs", "color": "#4CD964"},
-        {"type": "text", "text": f"🔷 魔力：{p.get('mp', calculated_max_mp)} / {calculated_max_mp}", "size": "xs", "color": "#007AFF"},
+        {"type": "text", "text": f"🔷 魔力：{p['mp']} / {calculated_max_mp}", "size": "xs", "color": "#007AFF"},
         {"type": "text", "text": f"🪙 資產：{p['gold']} 金幣", "size": "xs", "color": "#FFCC00"},
         {"type": "text", "text": f"📍 座標：📍【 {p.get('current_map', '主城')} 】", "size": "xs", "color": "#AF52DE"},
         {"type": "separator", "margin": "md", "color": "#333333"},
         
-        # 🔥 全新高階實戰面版展示區
+        # 🔥 高階實戰面板展示區
         {"type": "text", "text": "⚔️ 【 皇家高階核心戰力屬性 】", "weight": "bold", "size": "xs", "color": "#FF9500"},
         {"type": "box", "layout": "horizontal", "margin": "sm", "contents": [
-            {"type": "text", "text": f"💥 物理攻擊: {phys_atk}", "size": "xs", "color": "#FF3B30", "flex": 1},
-            {"type": "text", "text": f"🔮 魔法攻擊: {magic_atk}", "size": "xs", "color": "#AF52DE", "flex": 1}
+            {"type": "text", "text": f"💥 物攻: {phys_atk}", "size": "xs", "color": "#FF3B30", "flex": 1},
+            {"type": "text", "text": f"🔮 魔攻: {magic_atk}", "size": "xs", "color": "#AF52DE", "flex": 1}
         ]},
         {"type": "box", "layout": "horizontal", "margin": "xs", "contents": [
-            {"type": "text", "text": f"⚡ 連擊機率: {double_chance:.1f}%", "size": "xs", "color": "#34AADC", "flex": 1},
-            {"type": "text", "text": f"💥 暴擊機率: {crit_chance:.1f}%", "size": "xs", "color": "#4CD964", "flex": 1}
+            {"type": "text", "text": f"⚡ 連擊: {double_chance:.1f}%", "size": "xs", "color": "#34AADC", "flex": 1},
+            {"type": "text", "text": f"💥 暴擊: {crit_chance:.1f}%", "size": "xs", "color": "#4CD964", "flex": 1}
         ]},
-        {"type": "text", "text": f"🛡️ 物理防禦: +{eq_def} (附加加成)", "size": "xs", "color": "#E0E0E0", "margin": "xs"},
+        {"type": "text", "text": f"🛡️ 防禦: +{eq_def} (多部位附加防禦)", "size": "xs", "color": "#E0E0E0", "margin": "xs"},
         
         {"type": "separator", "margin": "md", "color": "#333333"},
-        {"type": "text", "text": "💪 【 六大遠古天賦基本屬性 】", "weight": "bold", "size": "xs", "color": "#FFCC00"},
+        
+        # ✨【💥 基礎屬性防截斷核心修正】拆分為獨立橫向二元 Box 網格，騰出 2 倍像素空間，徹底斬斷 ... 
+        {"type": "text", "text": f"💪 【 遠古天賦屬性 】(剩餘潛能: {p.get('attribute_points', 0)} 點)", "weight": "bold", "size": "xs", "color": "#FFCC00"},
         {"type": "box", "layout": "horizontal", "margin": "sm", "contents": [
-            {"type": "text", "text": f"🔸力量: {str_val} | 🔸敏捷: {agi_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
-            {"type": "text", "text": f"🔸智力: {int_val} | 🔸體力: {vit_val}", "size": "xs", "color": "#E0E0E0", "flex": 1}
+            {"type": "text", "text": f"🔸力量: {str_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
+            {"type": "text", "text": f"🔸敏捷: {agi_val}", "size": "xs", "color": "#E0E0E0", "flex": 1}
         ]},
-        {"type": "text", "text": f"🔸幸運: {luk_val} | 🔸精神: {men_val}  (剩餘潛能點: {p.get('attribute_points', 0)} 點)", "size": "xs", "color": "#E0E0E0", "margin": "xs"}
+        {"type": "box", "layout": "horizontal", "margin": "xs", "contents": [
+            {"type": "text", "text": f"🔸智力: {int_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
+            {"type": "text", "text": f"🔸體力: {vit_val}", "size": "xs", "color": "#E0E0E0", "flex": 1}
+        ]},
+        {"type": "box", "layout": "horizontal", "margin": "xs", "contents": [
+            {"type": "text", "text": f"🔸幸運: {luk_val}", "size": "xs", "color": "#E0E0E0", "flex": 1},
+            {"type": "text", "text": f"🔸精神: {men_val}", "size": "xs", "color": "#E0E0E0", "flex": 1}
+        ]}
     ]
 
     flex_bubble = {
