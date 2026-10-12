@@ -1,4 +1,3 @@
-python
 # bag.py (UI與快捷按鈕優化完全體 - 第一部分)
 import json
 import random
@@ -47,7 +46,6 @@ def get_bag_card(p):
             pure_w_name = w_name.split(" 的 ")[-1] if " 的 " in w_name else w_name
             w_info = weapons.SHOP_WEAPONS.get(pure_w_name, {"atk_bonus": 0, "desc": "未知神秘兵器。"})
             
-            # ✨ 【UI優化點：大區塊按鈕瘦身】改為內縮並列排版，大幅縮小按鈕高度
             contents.append({
                 "type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
                 "contents": [
@@ -57,7 +55,6 @@ def get_bag_card(p):
                     ]},
                     {"type": "text", "text": f"💥 物理傷害加成：+{w_info['atk_bonus']} 點", "size": "xs", "color": "#4CD964", "margin": "xs", "weight": "bold"},
                     {"type": "text", "text": f"📖 兵器神話：{w_info['desc']}", "size": "xs", "color": "#8E8E93", "margin": "xs", "wrap": True},
-                    # 精緻化水平靠右換裝小按鈕
                     {"type": "box", "layout": "horizontal", "marginTop": "xs", "contents": [
                         {"type": "spacer", "flex": 3},
                         {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "flex": 2,
@@ -65,13 +62,12 @@ def get_bag_card(p):
                     ]}
                 ]
             })
-    # 2. 🧪 【 藥水與補給物資 】（全面重構！新增右側一鍵飲用快捷按鈕組件）
+    # 2. 🧪 【 藥水與補給物資 】
     contents.append({"type": "text", "text": "🧪 【 藥水與補給物資 】", "weight": "bold", "size": "sm", "color": "#FF9500", "margin": "lg"})
     if not items:
         contents.append({"type": "text", "text": "   (消耗品倉庫目前空空如也)", "size": "xs", "color": "#8E8E93"})
     else:
         for name, count in items.items():
-            # ✨ 【UI 優化點：新增藥水快捷按鈕】將藥水包裝成水平網格，右側置入一鍵使用按鈕
             contents.append({
                 "type": "box", "layout": "vertical", "margin": "xs", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
                 "contents": [
@@ -176,6 +172,7 @@ def use_potion(p, potion_name):
     if potion_name not in CONSUMABLES: return "❌ 非可食用的藥水。"
     
     config = CONSUMABLES[potion_name]
+    # ✨ 【Bug 完美修復】精準加上 [0] 與 [1] 索引值拆解元組，徹底消滅隨機數計算閃退！
     heal_amount = random.randint(int(config["heal_range"][0]), int(config["heal_range"][1]))
     
     old_hp = p["hp"]
@@ -184,4 +181,4 @@ def use_potion(p, potion_name):
     if items[potion_name] == 0: del items[potion_name]
     inv["items"] = items; p["inventory"] = inv
     db_core.save_player(p)
-    return f"🧪 ✨ 你喝下了【{potion_name}】！\n💖 順利恢復了 {p['hp'] - old_hp}
+    return f"🧪 ✨ 你喝下了【{potion_name}】！\n💖 順利恢復了 {p['hp'] - old_hp} 點生命！\n🩸 血量狀態：{p['hp']} / {max_hp}"
