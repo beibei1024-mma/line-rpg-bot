@@ -1,4 +1,3 @@
-# bag.py (UI與快捷按鈕優化完全體 - 第一部分)
 import json
 import random
 import db_core
@@ -11,7 +10,7 @@ CONSUMABLES = {
 }
 
 def get_bag_card(p):
-    """🎒 生成網格化勇者私人物資倉庫卡片 (精緻化縮小裝備鈕、新增藥水一鍵使用快捷熱鍵)"""
+    """🎒 生成網格化勇者私人物資倉庫卡片 (全面視覺化武器素質欄與一鍵穿戴熱鍵)"""
     if "inventory" not in p or not p["inventory"]:
         p["inventory"] = {"items": {}, "materials": {}}
         
@@ -22,6 +21,7 @@ def get_bag_card(p):
     items = inv.get("items", {})
     materials = inv.get("materials", {})
     
+    # 讀取玩家儲存在 weapon_inventory 裡的備用武器包
     w_inv_str = p.get("weapon_inventory", "{}")
     if w_inv_str is None or w_inv_str == "None" or w_inv_str == "": w_inv_str = "{}"
     try: 
@@ -30,12 +30,12 @@ def get_bag_card(p):
         weapons_held = {}
     
     contents = [
-        {"type": "text", "text": "🎒 勇者皇家私人物資倉庫", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+        {"type": "text", "text": "🎒 勇者皇家私人物資", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
         {"type": "text", "text": f"👤 目前手持武裝：【{p.get('weapon', '赤手空拳')}】", "size": "xs", "color": "#4CD964", "align": "center", "margin": "xs"},
         {"type": "separator", "margin": "md", "color": "#333333"}
     ]
     
-    # 1. ⚔️ 【 裝備與兵器收藏庫 】（縮小按鈕大區塊，改為精緻並列式按鈕）
+    # 1. 核心優化：【 ⚔️ 裝備與兵器收藏庫 】視覺化網格圖卡化展示
     contents.append({"type": "text", "text": "⚔️ 【 裝備與兵器收藏庫 】", "weight": "bold", "size": "sm", "color": "#007AFF", "margin": "md"})
     
     active_weapons = {k: v for k, v in weapons_held.items() if v > 0}
@@ -50,47 +50,38 @@ def get_bag_card(p):
                 "type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
                 "contents": [
                     {"type": "box", "layout": "horizontal", "contents": [
-                        {"type": "text", "text": f"🗡️ {w_name}", "size": "sm", "color": "#FF9500", "weight": "bold", "flex": 4, "gravity": "center"},
-                        {"type": "text", "text": f"擁有: {count} 把", "size": "xs", "color": "#34AADC", "align": "end", "flex": 2, "gravity": "center"}
+                        {"type": "text", "text": f"🗡️ {w_name}", "size": "sm", "color": "#FF9500", "weight": "bold", "flex": 4},
+                        {"type": "text", "text": f"擁有: {count} 把", "size": "xs", "color": "#34AADC", "align": "end", "flex": 2}
                     ]},
                     {"type": "text", "text": f"💥 物理傷害加成：+{w_info['atk_bonus']} 點", "size": "xs", "color": "#4CD964", "margin": "xs", "weight": "bold"},
                     {"type": "text", "text": f"📖 兵器神話：{w_info['desc']}", "size": "xs", "color": "#8E8E93", "margin": "xs", "wrap": True},
-                    {"type": "box", "layout": "horizontal", "marginTop": "xs", "contents": [
-                        {"type": "spacer", "flex": 3},
-                        {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "flex": 2,
-                         "action": {"type": "message", "label": "⚔️ 裝備", "text": f"裝備 {w_name}"}}
-                    ]}
+                    {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "marginTop": "sm",
+                     "action": {"type": "message", "label": "⚔️ 立即裝備上身", "text": f"裝備 {w_name}"}}
                 ]
             })
-    # 2. 🧪 【 藥水與補給物資 】
+            
+    # 2. 渲染消耗品
     contents.append({"type": "text", "text": "🧪 【 藥水與補給物資 】", "weight": "bold", "size": "sm", "color": "#FF9500", "margin": "lg"})
     if not items:
         contents.append({"type": "text", "text": "   (消耗品倉庫目前空空如也)", "size": "xs", "color": "#8E8E93"})
     else:
         for name, count in items.items():
             contents.append({
-                "type": "box", "layout": "vertical", "margin": "xs", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
+                "type": "box", "layout": "horizontal", "margin": "xs",
                 "contents": [
-                    {"type": "box", "layout": "horizontal", "contents": [
-                        {"type": "text", "text": f"🔹 {name}", "size": "xs", "color": "#E0E0E0", "weight": "bold", "flex": 4, "gravity": "center"},
-                        {"type": "text", "text": f"數量: x{count}", "size": "xs", "color": "#4CD964", "align": "end", "flex": 2, "gravity": "center"}
-                    ]},
-                    {"type": "box", "layout": "horizontal", "marginTop": "xs", "contents": [
-                        {"type": "spacer", "flex": 3},
-                        {"type": "button", "style": "primary", "color": "#34AADC", "height": "sm", "flex": 2,
-                         "action": {"type": "message", "label": "🧪 使用", "text": f"使用 {name}"}}
-                    ]}
+                    {"type": "text", "text": f"🔹 {name}", "size": "xs", "color": "#E0E0E0", "flex": 4},
+                    {"type": "text", "text": f"x{count}", "size": "xs", "color": "#4CD964", "align": "end", "flex": 1}
                 ]
             })
             
-    # 3. 💎 【 怪物珍稀原料區 】
+    # 3. 渲染素材
     contents.append({"type": "text", "text": "💎 【 怪物珍稀原料區 】", "weight": "bold", "size": "sm", "color": "#AF52DE", "margin": "md"})
     if not materials:
         contents.append({"type": "text", "text": "   (尚未搜刮到任何魔物原料)", "size": "xs", "color": "#8E8E93"})
     else:
         for name, count in materials.items():
             contents.append({
-                "type": "box", "layout": "horizontal", "margin": "xs", "backgroundColor": "#222224", "paddingAll": "sm", "cornerRadius": "xs",
+                "type": "box", "layout": "horizontal", "margin": "xs",
                 "contents": [
                     {"type": "text", "text": f"🔸 {name}", "size": "xs", "color": "#E0E0E0", "flex": 4},
                     {"type": "text", "text": f"x{count}", "size": "xs", "color": "#FFCC00", "align": "end", "flex": 1}
@@ -103,7 +94,7 @@ def get_bag_card(p):
         "body": {"type": "box", "layout": "vertical", "spacing": "xs", "contents": contents},
         "footer": {
             "type": "box", "layout": "vertical",
-            "contents": [{"type": "text", "text": "💡 提示：點擊上方兵器或藥水格子右下角的【快捷按鈕】，系統將為您調度武裝或一鍵飲用補血！", "size": "xs", "color": "#8E8E93", "align": "center", "wrap": True}]
+            "contents": [{"type": "text", "text": "💡 提示：點擊上方兵器格子內的【⚔️ 立即裝備上身】按鈕，鐵匠鋪將全自動為您調度武裝！換下來的舊武器會安全移回包包中。", "size": "xs", "color": "#8E8E93", "align": "center", "wrap": True}]
         }
     }
 
@@ -172,7 +163,8 @@ def use_potion(p, potion_name):
     if potion_name not in CONSUMABLES: return "❌ 非可食用的藥水。"
     
     config = CONSUMABLES[potion_name]
-    # ✨ 【Bug 完美修復】精準加上 [0] 與 [1] 索引值拆解元組，徹底消滅隨機數計算閃退！
+    
+    # ✨ 【Bug 終極封印】精準為元組加上索引值 0 與 1，拆解出最小值與最大值，徹底消滅 random.randint 閃退！
     heal_amount = random.randint(int(config["heal_range"][0]), int(config["heal_range"][1]))
     
     old_hp = p["hp"]
