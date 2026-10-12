@@ -280,3 +280,32 @@ def _continue_battle_calculation(event, line_bot_api, p, enemy, log, total_p_dmg
         
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+    # ── ⚔️ 多部位暗黑裝備屬性動態累加回流器 (請將此段貼在 battle_core.py 屬性初始化前) ──
+    eq_slots_str = p.get("equipped_slots", "{}")
+    try: equipped = json.loads(eq_slots_str)
+    except: equipped = {}
+    
+    # 宣告裝備白字與副詞綴加成桶
+    eq_atk, eq_def, eq_mdef = 0, 0, 0
+    eq_affixes = {"strength": 0, "agility": 0, "intelligence": 0, "vitality": 0, "luck": 0, "sprit": 0}
+    
+    for slot, eq in equipped.items():
+        eq_atk += eq.get("atk", 0)
+        eq_def += eq.get("def", 0)
+        eq_mdef += eq.get("mdef", 0)
+        for stat, val in eq.get("affixes", {}).items():
+            eq_affixes[stat] = eq_affixes.get(stat, 0) + val
+
+    # 將裝備隨機副詞綴，動態疊加進角色的基礎屬性中
+    str_val = int((p.get("strength", 10) + eq_affixes["strength"]) * job_mod["str_mod"])
+    agi_val = int((p.get("agility", 10) + eq_affixes["agility"]) * job_mod["agi_mod"])
+    int_val = int((p.get("intelligence", 10) + eq_affixes["intelligence"]) * job_mod["int_mod"])
+    vit_val = int((p.get("vitality", 10) + eq_affixes["vitality"]) * job_mod["vit_mod"])
+    luk_val = int((p.get("luck", 10) + eq_affixes["luck"]) * job_mod["luk_mod"])
+    men_val = int((p.get("sprit", 10) + eq_affixes["sprit"]) * job_mod["men_mod"])
+    
+    # 裝備白字攻擊力與防禦力直接併入最終計算公式
+    w_bonus = eq_atk # 取代舊有單一武器
+    # 戰鬥中的勇者防禦公式改寫為： p_def = (vit_val // 2) + eq_def
+    # ─────────────────────────────────────────────────────────────
+

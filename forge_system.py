@@ -150,15 +150,10 @@ def execute_unequip_weapon(p):
     db_core.save_player(p)
     return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器 ── ⚔️【{current_weapon}】安全解下！已完整存入您的武器背包欄！"
 
-# forge_system.py (局部優化展示)
 def add_to_weapon_inventory(p, w_name):
     w_inv_str = p.get("weapon_inventory", "{}")
     if w_inv_str is None or w_inv_str == "None" or w_inv_str == "": w_inv_str = "{}"
-    try: 
-        w_dict = json.loads(w_inv_str)
-    except Exception: 
-        w_dict = {}
+    try: w_dict = json.loads(w_inv_str)
+    except Exception: w_dict = {}
     w_dict[w_name] = w_dict.get(w_name, 0) + 1
     p["weapon_inventory"] = json.dumps(w_dict, ensure_ascii=False)
-    # ✨ 【優化點】打寶、買現貨武器入庫時，全自動同步保存至實體 PostgreSQL 資料庫，防止掉線回檔
-    db_core.save_player(p)

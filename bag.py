@@ -30,7 +30,7 @@ def get_bag_card(p):
         weapons_held = {}
     
     contents = [
-        {"type": "text", "text": "🎒 勇者皇家私人物資", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+        {"type": "text", "text": "🎒 勇者皇家私人物資倉庫", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
         {"type": "text", "text": f"👤 目前手持武裝：【{p.get('weapon', '赤手空拳')}】", "size": "xs", "color": "#4CD964", "align": "center", "margin": "xs"},
         {"type": "separator", "margin": "md", "color": "#333333"}
     ]

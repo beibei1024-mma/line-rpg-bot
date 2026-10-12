@@ -221,3 +221,22 @@ def process_game_logic(event, line_bot_api, configuration):
     else:
         # 其他未被上方主城或全域快捷指令攔截的所有訊息（如普通攻擊、尋怪、施放技能等），皆交給純粹戰鬥計算機處理
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
+    # 貼在 game_core.py 的指令判斷區中 (例如 👤 我的狀態 下方)
+    elif user_msg == "黑市商店" or user_msg == "冒險商店":
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟動態黑市", contents=dynamic_market.get_market_flex(p)))
+        return
+    elif user_msg.startswith("黑市購買"):
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=dynamic_market.execute_market_buy(p, user_msg)))
+        return
+    elif user_msg == "我的裝備" or user_msg == "裝備":
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="多部位裝備欄", contents=player_equipment.get_equipped_panel(p)))
+        return
+    elif user_msg == "裝備背包" or user_msg == "裝備包":
+        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="武器防具備用包", contents=player_equipment.get_equipment_bag_flex(p)))
+        return
+    elif user_msg.startswith("穿戴裝備"):
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=player_equipment.wear_equipment_by_id(p, user_msg)))
+        return
+    elif user_msg.startswith("脫下裝備"):
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=player_equipment.unwear_equipment_by_slot(p, user_msg)))
+        return

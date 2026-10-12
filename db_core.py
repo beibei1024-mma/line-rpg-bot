@@ -1,4 +1,3 @@
-# db_core.py (優化版)
 import os
 import json
 import psycopg2
@@ -6,6 +5,37 @@ from psycopg2.extras import RealDictCursor
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
 MEMORY_PLAYERS = {}
+
+# db_core.py - 追加對接 Supabase 擴充核心函數
+
+def save_player(p):
+    """將玩家所有屬性（包含 JSON 化的多部位裝備、背包、黑市貨架）完整寫回 Supabase"""
+    # 這裡請根據您使用的資料庫驅動（如 psycopg2 或 supabase-py）進行實作
+    # 範例 SQL：
+    # """
+    # UPDATE players SET 
+    #     hp = %s, mp = %s, max_hp = %s, level = %s, exp = %s, gold = %s, weapon = %s, enemy = %s,
+    #     strength = %s, agility = %s, intelligence = %s, vitality = %s, luck = %s, sprit = %s,
+    #     equipped_slots = %s, equipment_inventory = %s, shop_seed = %s, shop_goods = %s
+    # WHERE user_id = %s
+    # """
+    pass
+
+def load_global_value(key, default_val):
+    """從 global_system_variables 全域參數表讀取全服共有參數（如世界 Boss 血量、排行）"""
+    # 範例 SQL：
+    # "SELECT variable_value FROM global_system_variables WHERE variable_key = %s"
+    # 讀取出來後再傳回對應的數值或字串即可。
+    return default_val
+
+def save_global_value(key, value):
+    """將全服最新數值（如扣血後的 Boss 殘餘生命、最新排行榜）寫回全域變數表"""
+    # 範例 SQL：
+    # """
+    # INSERT INTO global_system_variables (variable_key, variable_value) VALUES (%s, %s) 
+    # ON CONFLICT (variable_key) DO UPDATE SET variable_value = EXCLUDED.variable_value
+    # """
+    pass
 
 def get_db_connection():
     db_url = os.environ.get('DATABASE_URL')
@@ -29,10 +59,7 @@ def load_player(user_id):
     cur.close()
     conn.close()
     if player and player['enemy']: 
-        try:
-            player['enemy'] = json.loads(player['enemy']) if isinstance(player['enemy'], str) else player['enemy']
-        except Exception:
-            player['enemy'] = None
+        player['enemy'] = json.loads(player['enemy'])
     MEMORY_PLAYERS[user_id] = dict(player)
     return MEMORY_PLAYERS[user_id]
 
@@ -41,20 +68,17 @@ def save_player(p):
     conn = get_db_connection()
     cur = conn.cursor()
     enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
-    
-    # ✨ 【Bug 完美修復】精準補上 p.get('sprit', 10)，徹底解決 SQL 參數少一個導致的已讀不回
     cur.execute(
         "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s, last_sign_in=%s, current_map=%s, current_city=%s WHERE user_id=%s",
         (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
-         p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), 
-         p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p.get('last_sign_in', 'None'), 
-         p.get('current_map', '主城'), p.get('current_city', '新手村'), p['user_id'])
+         p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p.get('last_sign_in', 'None'), p.get('current_map', '主城'), p.get('current_city', '新手村'), p['user_id'])
     )
     conn.commit()
     cur.close()
     conn.close()
 
 def make_battle_card(title, p, enemy):
+    """【皇家地圖分流完全體】依位置動態切換小圖標，戰鬥中常駐解鎖技能防禦熱鍵"""
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
@@ -105,17 +129,23 @@ def make_battle_card(title, p, enemy):
     
     flex_bubble = {"type": "bubble", "styles": {"body": {"backgroundColor": "#1C1C1E"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}
     
+    # 🕹️ 橫向滑動 Quick Reply 小標籤動態解鎖大腦
     quick_items = []
+    
     if p["hp"] <= 0:
         quick_items.append(QuickReplyItem(action=MessageAction(label="😇 祈求復活", text="復活")))
     elif enemy:
+        # ⚔️ 1. 野外激烈戰鬥中（精準 4 空格齊頭對齊修復！）
         quick_items.append(QuickReplyItem(action=MessageAction(label="⚔️ 普通攻擊", text="攻擊")))
+        # ✨ 【優化二：戰術實裝】常駐為所有職業塞入【🛡️ 技能防禦】實體小標籤快捷鍵！
         quick_items.append(QuickReplyItem(action=MessageAction(label="🛡️ 技能防禦", text="使用技能防禦")))
         for s_name, s_info in job_mod.get("skills", {}).items():
             if s_info.get("type") == "active" and s_name != "普通攻擊":
                 quick_items.append(QuickReplyItem(action=MessageAction(label=f"🔮 {s_name}", text=f"使用技能 {s_name}")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🏃 轉身逃跑", text="逃跑")))
+        
     elif p.get("current_map") == "主城":
+        # 🏙️ 2. 【皇家安全主城】快捷控制小圖標列
         quick_items.append(QuickReplyItem(action=MessageAction(label="📆 每日簽到", text="簽到")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="⚒️ 遠古工坊NPC", text="工坊")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🗼 試煉之塔", text="挑戰爬塔")))
@@ -124,7 +154,9 @@ def make_battle_card(title, p, enemy):
         quick_items.append(QuickReplyItem(action=MessageAction(label="🛡️ 查看裝備", text="我的裝備")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🎒 打開背包", text="我的背包")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🚪 出城冒險", text="世界地圖")))
+        
     else:
+        # 🌲 3. 在普通野外地圖（閒置狀態）
         quick_items.append(QuickReplyItem(action=MessageAction(label="🔍 尋找怪物", text="尋怪")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="👤 我的狀態", text="我的狀態")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🎒 打開背包", text="我的背包")))
