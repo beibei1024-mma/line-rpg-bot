@@ -83,6 +83,98 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             total_p_dmg = d
 
         enemy["hp"] -= total_p_dmg
+# battle_core.py - 皇家戰鬥計算機 v3.8 (第二部分：技能與升級連通)
+
+        # ── 🔮 技能施放分流計算處理 ──
+        elif user_msg.startswith("使用技能"):
+            skill_name = user_msg.replace("使用技能", "").strip()
+            if skill_name not in job_mod.get("skills", {}):
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 技能錯誤！你目前職業的天賦樹中不會【{skill_name}】法術。"))
+                return
+                
+            mp_cost = job_mod["skills"][skill_name].get("mp_cost", 0)
+            if p["mp"] < mp_cost:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔷 魔力不足！施放【{skill_name}】需要 {mp_cost} 點 MP，你目前只有 {p['mp']} 點！"))
+                return
+                
+            p["mp"] -= mp_cost
+            log += f"🔮 奧義發動！你消耗了 🔷 {mp_cost} 點 MP 施放秘術 ── ⚡【{skill_name}】！\n"
+            base_weapon_atk = 12 + str_val + eq_atk
+            
+            # ⚔️ 1. 戰士 ➡️ 狂戰 ➡️ 修羅體系技能
+            if skill_name == "蓄力重擊": total_p_dmg = int(base_weapon_atk * 1.5)
+            elif skill_name == "橫掃千軍": total_p_dmg = int(base_weapon_atk * 1.8) + 50
+            elif skill_name == "戰吼震懾": total_p_dmg = int(base_weapon_atk * 1.3) + 100
+            elif skill_name == "破甲一擊": total_p_dmg = int(base_weapon_atk * 2.2) + 150
+            elif skill_name == "血性狂暴": total_p_dmg = int(base_weapon_atk * 2.9) + 300
+            elif skill_name == "旋風斬": total_p_dmg = int(base_weapon_atk * 3.4) + 450
+            elif skill_name == "怒火重擊": total_p_dmg = int(base_weapon_atk * 4.0) + 600
+                
+            # 🛡️ 2. 騎士 ➡️ 十字軍 ➡️ 督軍體系技能
+            elif skill_name == "盾擊": total_p_dmg = int((12 + vit_val + eq_atk) * 1.4)
+            elif skill_name == "神聖之光": total_p_dmg = int((10 + int_val) * 1.6) + 40
+            elif skill_name == "神聖盾擊": total_p_dmg = int((12 + vit_val + eq_atk) * 2.6) + 200
+                
+            # 🔮 3. 魔法師 ➡️ 魔導士 ➡️ 元素使體系技能
+            elif skill_name == "魔能彈": total_p_dmg = int((10 + int_val) * 1.3)
+            elif skill_name == "火球術": total_p_dmg = int((10 + int_val) * 2.0) + 60
+            elif skill_name == "閃電術": total_p_dmg = int((10 + int_val) * 2.4) + 110
+            elif skill_name == "奧術飛彈": total_p_dmg = int((10 + int_val) * 2.7) + 160
+            
+            else: total_p_dmg = int(base_weapon_atk * 1.2)
+            log += f"💥 重創命中！技能對【{enemy['name']}】造成了 {total_p_dmg} 點實體傷害！\n"
+
+        enemy["hp"] -= total_p_dmg
+
+        # ── 🎉 4. 戰鬥大獲全勝結算 ──
+        if enemy["hp"] <= 0:
+            gold_data = enemy.get("gold_range", (10, 50))
+            if isinstance(gold_data, (list, tuple)) and len(gold_data) >= 2:
+                final_gold = random.randint(int(gold_data[0]), int(gold_data[1]))
+            else:
+                final_gold = random.randint(int(gold_data) // 2, int(gold_data)) if int(gold_data) > 0 else 10
+                
+            p["gold"] += final_gold
+            p["exp"] += enemy.get("exp", 15)
+            p["mp"] = min(calculated_max_mp, p["mp"] + 25) 
+            log += f"\n🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy.get('exp', 15)}！\n🔷 調息魔力恢復 +25 點。\n"
+            
+            # 🛠️ 【即刻接入升級中樞大腦】徹底解決不會升等的 Bug
+            try:
+                import player_level_up
+                level_up_bonus_msg = player_level_up.check_and_execute_level_up(p)
+                log += level_up_bonus_msg
+            except: pass
+            
+            # 3% 機率掉落素材
+            if random.random() < 0.30 and enemy.get("drop_item"):
+                bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
+                log += f"💎 【幸運掉寶】！素材：【{enemy['drop_item']}】x1！\n"
+                
+            p["enemy"] = None
+            db_core.save_player(p)
+            card_data = db_core.make_battle_card(log, p, None)
+        else:
+            # ── 🩹 5. 怪物殘存發動環境反擊 ──
+            final_m_atk = random.randint(1, enemy.get("atk", 5))
+            p_def = int((vit_val // 2) * p_defense_multiplier) + eq_def
+            dmg_received = max(1, final_m_atk - p_def)
+            p["hp"] = max(0, p["hp"] - dmg_received)
+            log += f"\n🩹 【{enemy['name']}】發動反擊！你受到 {dmg_received} 點傷害！"
+            
+            if p["hp"] <= 0:
+                p["enemy"] = None
+                p["current_map"] = "主城"
+                log += "\n💀 你受傷過重陣亡了！已被大天使靈魂傳送回主城。"
+                db_core.save_player(p)
+                card_data = db_core.make_battle_card(log, p, None)
+            else:
+                p["enemy"] = enemy
+                db_core.save_player(p)
+                card_data = db_core.make_battle_card(log, p, enemy)
+                
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "戰報結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
 
         # ── 🎉 4. 戰鬥大獲全勝結算 ──
         if enemy["hp"] <= 0:
