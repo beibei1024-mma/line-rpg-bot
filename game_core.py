@@ -1,8 +1,7 @@
-# game_core.py - 皇家中央分流主控台 (防死鎖最佳化版)
+# game_core.py - 皇家中央分流主控台 (多部位黑市完全體·第一部分)
 
 import db_core
 import player
-import shop
 import bag
 import maps
 import battle_core
@@ -12,11 +11,15 @@ import jobs_system
 import random
 import datetime
 
+# 導入全新擴充的暗黑裝備與動態黑市模組
+import dynamic_market
+import player_equipment
+
 from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
 from linebot.models import TextSendMessage, FlexSendMessage
 
 def process_game_logic(event, line_bot_api, configuration):
-    """【皇家分流主控台 屬性配點解鎖版】全新實裝獨立加點管線，徹底封印配點卡死死角"""
+    """【皇家分流主控台 完全體】整合多部位實體穿戴與每小時動態刷新的時空黑市"""
     user_id = event.source.user_id
     user_msg = event.message.text.replace(" ", "").strip()
     
@@ -28,7 +31,7 @@ def process_game_logic(event, line_bot_api, configuration):
         p["current_map"] = "主城"
         p["enemy"] = None
         db_core.save_player(p)
-        card_data = db_core.make_battle_card("🦅 ✨ 飛向天空！你引導傳送羽毛，順利回到安全城鎮：📍【 主城 】！\n\n🏪 城市功能（補給商店、每日簽到、工坊、挑戰賽）已全數為您解鎖！", p, None)
+        card_data = db_core.make_battle_card("🦅 ✨ 飛向天空！你引導傳送羽毛，順利回到安全城鎮：📍【 主城 】！\n\n🏪 城市功能（黑市商店、每日簽到、工坊、世界Boss挑戰賽）已全數為您解鎖！", p, None)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "回城成功", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
@@ -40,7 +43,7 @@ def process_game_logic(event, line_bot_api, configuration):
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 👤 全域核心指令：狀態 / 背包 / 裝備
+    # 👤 全域核心指令：狀態 / 背包（不鎖主城，野外也可隨時查閱）
     if user_msg in ["我的狀態", "狀態"]:
         card_data = player.get_status_card(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的狀態面板", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
@@ -51,20 +54,13 @@ def process_game_logic(event, line_bot_api, configuration):
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的私人物品倉庫", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
-    elif user_msg in ["我的裝備", "裝備"]:
-        card_data = forge_system.get_equipment_card(p)
-        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的神聖裝備欄", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-        return
 
     # ✨ 【潛能配點大腦】
     elif user_msg.startswith("加點") or user_msg.startswith("配點"):
         clean_cmd = user_msg.replace("配點", "加點")
         attr_name = clean_cmd.replace("加點", "")[:2]
         pts_str = clean_cmd.replace("加點", "")[2:]
-        
-        try:
-            pts_to_add = int(pts_str)
+        try: pts_to_add = int(pts_str)
         except ValueError:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 點數解析失敗！格式正確口令範例：【加點 力量 5】"))
             return
@@ -73,35 +69,24 @@ def process_game_logic(event, line_bot_api, configuration):
         if pts_to_add <= 0 or free_pts < pts_to_add:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 潛能點數不足！你目前剩餘的自由潛能點只有 {free_pts} 點！"))
             return
-            
         attr_mapping = {"力量": "strength", "敏捷": "agility", "智力": "intelligence", "體力": "vitality", "幸運": "luck", "精神": "sprit"}
         if attr_name not in attr_mapping:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 可加點項目僅限：力量、敏捷、智力、體力、幸運、精神。"))
             return
             
-        db_field = attr_mapping[attr_name]
-        p[db_field] = p.get(db_field, 10) + pts_to_add
+        p[attr_mapping[attr_name]] = p.get(attr_mapping[attr_name], 10) + pts_to_add
         p["attribute_points"] = free_pts - pts_to_add
         db_core.save_player(p)
         
-        reply_log = f"💪 【 屬性配點成功 】 💪\n─────────────────\n你引導了體內的遠古潛能，將 {pts_to_add} 點剩餘點數分配給了 ── ✨【 {attr_name} 】屬性！\n\n📈 能力激發：該屬性已實體在後台暴漲！輸入【我的狀態】即可查閱全新的橫向網格數值面板！"
+        reply_log = f"💪 【 屬性配點成功 】 💪\n─────────────────\n你引導了體內的遠古潛能，將 {pts_to_add} 點剩餘點數分配給了 ── ✨【 {attr_name} 】屬性！"
         card_data = db_core.make_battle_card(reply_log, p, p.get("enemy"))
-        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "屬性配點結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "配點結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # ⚔️ 戰鬥、換裝、世界地圖與藥水快捷攔截
+    # ⚔️ 戰鬥、世界地圖與藥水快捷攔截
     elif user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
-        return
-    elif user_msg.startswith("裝備") or user_msg.startswith("穿上"):
-        res_text = bag.equip_weapon_from_bag(p, user_msg)
-        card_data = db_core.make_battle_card(res_text, p, p.get("enemy"))
-        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "更換裝備結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-        return 
-    elif user_msg == "脫下裝備":
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
         return
     elif user_msg in ["世界地圖", "出城冒險"]:
         if current_loc == "主城" and p.get("enemy") is not None:
@@ -118,22 +103,20 @@ def process_game_logic(event, line_bot_api, configuration):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=bag.use_potion(p, potion_name)))
         return
 
-    # 🔒 城市專屬鎖死功能安全隔離牆
-    CITY_ONLY_COMMANDS = ["冒險商店", "購買", "簽到", "挑戰", "挑戰爬塔", "挑戰世界Boss", "世界Boss", "工坊", "鍛造"]
+    # 🔒 城市專屬鎖死功能安全隔離牆 (包含全新黑市與挑戰賽防護)
+    CITY_ONLY_COMMANDS = ["冒險商店", "黑市商店", "黑市", "黑市購買", "簽到", "挑戰", "挑戰世界Boss", "世界Boss", "工坊", "鍛造"]
     is_city_cmd = any(user_msg.startswith(cmd) or user_msg == cmd for cmd in CITY_ONLY_COMMANDS)
-    
     if is_city_cmd and current_loc != "主城":
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 鎖定限制！你目前位於野外【{current_loc}】。野外無法開啟商店、簽到、工坊或發起爬塔！請先點擊小圖標【🦅 飛回城鎮】或輸入【回城】！"))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 鎖定限制！你目前位於野外【{current_loc}】。安全區功能無法在此開啟！請先點擊快捷鍵【🦅 飛回城鎮】或輸入【回城】！"))
         return
 
     # 🏙️ 處於主城安全區內的專屬指令導流
     if current_loc == "主城":
-        if user_msg == "冒險商店":
-            line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟商店", contents=shop.get_shop_card(p)))
+        if user_msg in ["冒險商店", "黑市商店", "黑市"]:
+            line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟動態時空黑市", contents=dynamic_market.get_market_flex(p)))
             return
-        elif user_msg.startswith("購買"):
-            item = user_msg.replace("購買", "").strip()
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=shop.buy_weapon(p, item)))
+        elif user_msg.startswith("黑市購買"):
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=dynamic_market.execute_market_buy(p, user_msg)))
             return
         elif user_msg == "簽到":
             reward_gold = random.randint(500, 2000)
@@ -150,93 +133,84 @@ def process_game_logic(event, line_bot_api, configuration):
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "簽到成功", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
             with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
+# game_core.py - 皇家中央分流主控台 (多部位黑市完全體·第二部分)
+
         elif user_msg in ["冒險挑戰", "挑戰"]:
             card_data = challenge_system.get_challenge_menu(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "挑戰場", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
             with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
-        elif user_msg == "挑戰爬塔":
-            res = challenge_system.execute_tower_climb(p)
-            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "試煉戰況", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
-            with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-            return
+            
         elif user_msg in ["挑戰世界Boss", "世界Boss"]:
             res = challenge_system.execute_world_boss_raid(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
             with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
+            
         elif user_msg in ["鍛造工坊", "鍛造", "工坊"]:
             card_data = forge_system.get_forge_menu(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-# game_core.py - 後半段分流控制（承接主城內部指令判斷）
-
-        # ⚒️ 處理主城內部的「工坊」選單與「鍛造」執行
-        elif user_msg in ["鍛造工坊", "鍛造", "工坊"]:
-            card_data = forge_system.get_forge_menu(p)
-            msg_payload = {
-                "replyToken": event.reply_token, 
-                "messages": [{
-                    "type": "flex", 
-                    "altText": "鍛造工坊", 
-                    "contents": card_data["flex"], 
-                    "quickReply": card_data["quick_reply"]
-                }]
-            }
-            with ApiClient(configuration) as api_client: 
-                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-            return # ✨ 【Bug 完美校正】補上漏掉的 return 阻斷器，徹底防範工坊選單執行後往下錯亂！
+            with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+            return
             
         elif user_msg.startswith("鍛造"):
             res = forge_system.execute_forge_weapon(p, user_msg)
             if isinstance(res, str):
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
             else:
-                msg_payload = {
-                    "replyToken": event.reply_token, 
-                    "messages": [{
-                        "type": "flex", 
-                        "altText": "工坊熔煉結果", 
-                        "contents": res["flex"], 
-                        "quickReply": res["quick_reply"]
-                    }]
-                }
-                with ApiClient(configuration) as api_client: 
-                    MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+                msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "工坊熔煉結果", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
+                with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
             
         elif user_msg in ["尋找怪物", "尋怪", "攻擊", "使用技能"]:
-            line_bot_api.reply_message(
-                event.reply_token, 
-                TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！")
-            )
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
             return
 
     # ─────────────────────────────────────────────
-    # 🌲 【核心修正區】完全脫離「if current_loc == '主城'」的管轄範圍！
-    # 確保玩家處於普通野外危險地圖時，不論是閒置、尋怪、轉職、戰鬥揮刀都能完美導流。
+    # 🌲 【皇家全局核心外置判定牆】
+    # 這裡已彻底擺脫 current_loc == '主城' 縮排，不論在城內或野外皆可自由操作！
     # ─────────────────────────────────────────────
-    if user_msg.startswith("轉職"):
+    
+    # 🛡️ 1. 開啟多部位裝備實體面板
+    if user_msg in ["我的裝備", "裝備"]:
+        line_bot_api.reply_message(
+            event.reply_token, 
+            FlexSendMessage(alt_text="多部位裝備欄", contents=player_equipment.get_equipped_panel(p))
+        )
+        return
+        
+    # 🎒 2. 開啟暗黑級神兵防具備用背包
+    elif user_msg in ["裝備背包", "裝備包", "我的裝備包"]:
+        line_bot_api.reply_message(
+            event.reply_token, 
+            FlexSendMessage(alt_text="武器防具備用包", contents=player_equipment.get_equipment_bag_flex(p))
+        )
+        return
+
+    # ⚡ 3. 實體一鍵穿戴變更（UUID 精確比對頂替機制）
+    elif user_msg.startswith("穿戴裝備"):
+        line_bot_api.reply_message(
+            event.reply_token, 
+            TextSendMessage(text=player_equipment.wear_equipment_by_id(p, user_msg))
+        )
+        return
+        
+    # ❌ 4. 多部位防具安全解下收回包包
+    elif user_msg.startswith("脫下裝備"):
+        line_bot_api.reply_message(
+            event.reply_token, 
+            TextSendMessage(text=player_equipment.unwear_equipment_by_slot(p, user_msg))
+        )
+        return
+
+    # 🔮 5. 本命職涯天賦覺醒與突破
+    elif user_msg.startswith("轉職"):
         jobs_system.handle_job_transfer(event, line_bot_api, p, user_msg, configuration)
         return
+
+    # ─────────────────────────────────────────────
+    # 🛑 【真·全局最末端最終保底管線】
+    # 當訊息不符合上方任何特定快捷指令時，代表勇者在野外發動普通砍擊、尋怪或施放攻擊技能
+    # ─────────────────────────────────────────────
     else:
-        # 其他未被上方主城或全域快捷指令攔截的所有訊息（如普通攻擊、尋怪、施放技能等），皆交給純粹戰鬥計算機處理
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
-    # 貼在 game_core.py 的指令判斷區中 (例如 👤 我的狀態 下方)
-    elif user_msg == "黑市商店" or user_msg == "冒險商店":
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="開啟動態黑市", contents=dynamic_market.get_market_flex(p)))
-        return
-    elif user_msg.startswith("黑市購買"):
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=dynamic_market.execute_market_buy(p, user_msg)))
-        return
-    elif user_msg == "我的裝備" or user_msg == "裝備":
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="多部位裝備欄", contents=player_equipment.get_equipped_panel(p)))
-        return
-    elif user_msg == "裝備背包" or user_msg == "裝備包":
-        line_bot_api.reply_message(event.reply_token, FlexSendMessage(alt_text="武器防具備用包", contents=player_equipment.get_equipment_bag_flex(p)))
-        return
-    elif user_msg.startswith("穿戴裝備"):
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=player_equipment.wear_equipment_by_id(p, user_msg)))
-        return
-    elif user_msg.startswith("脫下裝備"):
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=player_equipment.unwear_equipment_by_slot(p, user_msg)))
-        return
