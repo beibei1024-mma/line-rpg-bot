@@ -14,7 +14,7 @@ from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
 from linebot.models import TextSendMessage, FlexSendMessage
 
 def process_game_logic(event, line_bot_api, configuration):
-    """【皇家全功能主控台 生死大合流版】"""
+    """【皇家主控台 終極完全體】補齊換裝阻斷路由，完美實裝一鍵換裝智慧圖標回圈"""
     user_id = event.source.user_id
     user_msg = event.message.text.replace(" ", "").strip()
     
@@ -31,29 +31,53 @@ def process_game_logic(event, line_bot_api, configuration):
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 😇 【真・生死管道合流】精準攔截「復活」口令！改用最防彈的 v3 Dict 非同步發送組合包！
+    # 😇 處理【復活】
     elif user_msg == "復活" or user_msg == "祈求復活":
         card_data = player.handle_resurrect(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "勇者復活歸來", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 1. 基礎狀態查詢分流 (全區開放)
+    # 👤 1. 處理【我的狀態】面板 
     if user_msg == "我的狀態" or user_msg == "狀態":
         card_data = player.get_status_card(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的狀態面板", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+        
+    # 🎒 2. 處理【我的背包】倉庫 
     elif user_msg == "我的背包" or user_msg == "背包":
         card_data = bag.get_bag_card(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的私人物品倉庫", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+        
+    # 🛡️ 3. 處理【我的裝備】裝備欄
     elif user_msg == "我的裝備" or user_msg == "裝備":
         card_data = forge_system.get_equipment_card(p)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的神聖裝備欄", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+        
+    # ✨ 【Bug 終極修正點】一鍵換裝攔截點完美對齊 Dict 發送模型，補齊 return 徹底阻斷重疊字！
+    elif user_msg.startswith("裝備") or user_msg.startswith("穿上"):
+        res_text = bag.equip_weapon_from_bag(p, user_msg)
+        # 呼叫 db_core 生成符合勇者當前地圖（主城或野外）的智慧小圖標控制列，形成流暢體驗
+        card_data = db_core.make_battle_card(res_text, p, p["enemy"])
+        
+        msg_payload = {
+            "replyToken": event.reply_token,
+            "messages": [{
+                "type": "flex", 
+                "altText": "更換裝備結果", 
+                "contents": card_data["flex"], 
+                "quickReply": card_data["quick_reply"]
+            }]
+        }
+        with ApiClient(configuration) as api_client: 
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return # ⛔ 鋼鐵阻斷！絕對不再讓代碼下滑到後方的 else 分流！
+        
     elif user_msg == "脫下裝備":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
         return
