@@ -14,7 +14,7 @@ from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
 from linebot.models import TextSendMessage, FlexSendMessage
 
 def process_game_logic(event, line_bot_api, configuration):
-    """【皇家主控台 終極完全體】補齊換裝阻斷路由，完美實裝一鍵換裝智慧圖標回圈"""
+    """【皇家主控台 模組路由分流修正版】精準導正使用技能與使用藥水的攔截順序，封印背包報錯"""
     user_id = event.source.user_id
     user_msg = event.message.text.replace(" ", "").strip()
     
@@ -58,25 +58,20 @@ def process_game_logic(event, line_bot_api, configuration):
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "我的神聖裝備欄", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+
+    # ⚔️ 【Bug 終極封印點 1】優先提升戰鬥主動技能的路由順序！只要是施放技能或防禦，100% 搶先導流，絕不滑入藥水區！
+    elif user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
+        # 移交純戰鬥大腦，交由戰鬥大腦解析技能傷害與扣除 MP
+        battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
+        return
         
-    # ✨ 【Bug 終極修正點】一鍵換裝攔截點完美對齊 Dict 發送模型，補齊 return 徹底阻斷重疊字！
+    # ✨ 處理【裝備 / 穿上】口令（從背包更換裝備）
     elif user_msg.startswith("裝備") or user_msg.startswith("穿上"):
         res_text = bag.equip_weapon_from_bag(p, user_msg)
-        # 呼叫 db_core 生成符合勇者當前地圖（主城或野外）的智慧小圖標控制列，形成流暢體驗
         card_data = db_core.make_battle_card(res_text, p, p["enemy"])
-        
-        msg_payload = {
-            "replyToken": event.reply_token,
-            "messages": [{
-                "type": "flex", 
-                "altText": "更換裝備結果", 
-                "contents": card_data["flex"], 
-                "quickReply": card_data["quick_reply"]
-            }]
-        }
-        with ApiClient(configuration) as api_client: 
-            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-        return # ⛔ 鋼鐵阻斷！絕對不再讓代碼下滑到後方的 else 分流！
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "更換裝備結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return 
         
     elif user_msg == "脫下裝備":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
@@ -91,7 +86,9 @@ def process_game_logic(event, line_bot_api, configuration):
         res_text = maps.change_map(p, user_msg)
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res_text))
         return
-    elif user_msg.startswith("使用"):
+        
+    # 🧪 【Bug 終極封印 2】加裝防禦隔離牆，此處只專心處理喝水，且絕對不包含戰鬥招式！
+    elif user_msg.startswith("使用") and not user_msg.startswith("使用技能"):
         potion_name = user_msg.replace("使用", "").strip()
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=bag.use_potion(p, potion_name)))
         return
