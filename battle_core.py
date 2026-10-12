@@ -1,3 +1,4 @@
+# battle_core.py (優化分段完全體 - 第一部分)
 import random
 from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient, BroadcastRequest
 from linebot.models import TextSendMessage, FlexSendMessage
@@ -9,12 +10,19 @@ import bag
 import jobs
 import jobs_system
 import notice_system
-
-# ✨ 【Bug 終極封印】精準在頂部補上 forge_system 的全域導入，徹底瓦解 NameError 閃退已讀不回！
 import forge_system
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【純粹戰鬥計算機 v2.5】補齊全域導入組件，讓打怪爆裝與舊武器回存背包管線完美接通"""
+    """【純粹戰鬥計算機 v2.6】加入主城安全區物理隔離防禦鎖，保障城鎮秩序"""
+    current_location = p.get("current_map", "主城")
+    
+    # 🛡️ 【中央安全攔截牆】若玩家在主城卻執行此戰鬥大腦，直接就地清空怪物並退回請求
+    if current_location == "主城":
+        p["enemy"] = None
+        db_core.save_player(p)
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 安全區秩序鎖定！主城禁止任何械鬥、尋怪、攻擊或使用主動技能！請先出城冒險！"))
+        return
+
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA: current_job = "初心者"
@@ -59,7 +67,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         if p["enemy"] is not None:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚔️ 眼前還有怪物！請發動【攻擊】或施放職業技能！"))
             return
-        current_location = p.get("current_map", "新手村")
+            
         random_monster = monsters.generate_random_monster(current_location)
         p["enemy"] = random_monster
         db_core.save_player(p)
@@ -108,11 +116,9 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             
         enemy = p["enemy"]
         log = ""
-        
         clean_msg = user_msg.replace(" ", "").strip()
         is_defense = (clean_msg == "使用技能防禦" or clean_msg == "技能防禦")
         is_skill = clean_msg.startswith("使用技能") and not is_defense
-        
         skill_name = clean_msg.replace("使用技能", "").strip() if is_skill else ""
         
         p_defense_multiplier = 1.0
@@ -171,176 +177,96 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 total_p_dmg = int((10 + int_val) * 3.2) + 400
             elif skill_name == "正義裁決":
                 total_p_dmg = int((12 + vit_val + str_val) * 4.8) + 900
-                
-            # 🔮 [3] 魔法師 ➡️ 魔導士 ➡️ 元素使體系
+            # 🔮 [3] 魔法師 ➡️ 魔導士 ➡️ 元素使體系（法術加成）
             elif skill_name == "魔能彈":
                 total_p_dmg = int((10 + int_val) * 1.3)
             elif skill_name == "火球術":
-                total_p_dmg = int((10 + int_val) * 2.0) + 60
-            elif skill_name == "閃電術":
-                total_p_dmg = int((10 + int_val) * 2.4) + 110
-            elif skill_name == "奧術飛彈":
-                total_p_dmg = int((10 + int_val) * 2.7) + 160
-            elif skill_name == "元素暴風":
-                total_p_dmg = int((10 + int_val) * 3.6) + 400
-            elif skill_name == "冰凍術":
-                total_p_dmg = int((10 + int_val) * 3.0) + 300
-            elif skill_name == "魔力燃燒":
-                total_p_dmg = int((10 + int_val) * 3.3) + 350
-            elif skill_name == "極凍終焉":
-                total_p_dmg = int((10 + int_val) * 5.8) + 1000
-            elif skill_name == "末日流星":
-                total_p_dmg = int((10 + int_val) * 6.6) + 1300
-            elif skill_name == "雷神之怒":
-                total_p_dmg = int((10 + int_val) * 5.0) + 850
-                
-            # 🗡️ [4] 盜賊 ➡️ 刺客 ➡️ 暗夜行者體系
-            elif skill_name == "背刺":
-                total_p_dmg = int((12 + agi_val + w_bonus) * 1.6)
-            elif skill_name == "毒刃襲擊":
-                total_p_dmg = int((12 + agi_val + w_bonus) * 2.3) + 100
-            elif skill_name == "影分身":
-                total_p_dmg = int((12 + agi_val + w_bonus) * 3.4) + 350
-            elif skill_name == "弒神終結":
-                total_p_dmg = int((12 + agi_val + luk_val + w_bonus) * 5.6) + 900
-            elif skill_name == "瞬獄殺":
-                total_p_dmg = int((12 + agi_val + w_bonus) * 6.3) + 1200
-                
-            # 🏹 [5] 弓箭手 ➡️ 獵人 ➡️ 遊俠體系
-            elif skill_name == "二連矢":
-                total_p_dmg = int((12 + agi_val + w_bonus) * 1.7) + 40
-            elif skill_name == "狙擊一擊":
-                total_p_dmg = int((12 + agi_val + w_bonus) * 2.5) + 200
-            elif skill_name == "爆影狂襲":
-                total_p_dmg = int((12 + agi_val + w_bonus) * 3.3) + 400
-            elif skill_name == "暴風萬箭破":
-                total_p_dmg = int((12 + agi_val + luk_val + w_bonus) * 5.4) + 1100
-                
-            # ⛪ [6] 祭師 ➡️ 賢者 ➡️ 大主教體系 (神聖療癒與光系懲戒)
-            elif skill_name in ["治癒術", "群體療癒"]:
-                heal = int((int_val + men_val) * 2.5)
-                old_h = p["hp"]
-                p["hp"] = min(calculated_max_hp, p["hp"] + heal)
-                log += f"💖 聖光治癒！神聖恢復了生命值 +{p['hp'] - old_h} 點！\n"
-                total_p_dmg = int(int_val * 0.8)
-            elif skill_name == "聖光懲戒":
-                total_p_dmg = int((10 + int_val + men_val) * 2.4) + 150
-            elif skill_name == "神聖讚美詩":
-                total_p_dmg = int((10 + int_val + men_val) * 5.5) + 1000
+                total_p_dmg = int((10 + int_val) * 1.8) + 60
+            elif skill_name == "雷擊術":
+                total_p_dmg = int((10 + int_val) * 2.2) + 120
+            elif skill_name == "暴風雪":
+                total_p_dmg = int((10 + int_val) * 3.5) + 350
+            elif skill_name == "末日審判":
+                total_p_dmg = int((10 + int_val) * 5.5) + 1000
             else:
-                total_p_dmg = int((str_val + int_val + agi_val) * 1.5)
+                # 保底法術傷害
+                total_p_dmg = int((10 + int_val) * 1.2)
                 
-            log += f"💥 重創命中！技能對【{enemy['name']}】造成了 {total_p_dmg} 點實體法術傷害！\n"
+            log += f"💥 魔能炸裂！法術對【{enemy['name']}】造成了 {total_p_dmg} 點魔法傷害！\n"
         else:
-            # 普通物理揮刀
-            crit_chance = min(80, 10 + (luk_val // 5)) / 100.0          
-            crit_dmg_mod = 1.5 + (luk_val * 0.005)                     
-            double_atk_chance = min(60, 2 + (agi_val // 6)) / 100.0     
+            # 🗡️ 執行普通攻擊（有連擊與爆擊的判定體系）
+            double_chance = min(60, 2 + (agi_val // 6))
+            crit_chance = min(80, 10 + (luk_val // 5))
             
-            is_double = random.random() < double_atk_chance
-            for i in range(2 if is_double else 1):
-                d = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
-                if random.random() < crit_chance:
-                    d = int(d * crit_dmg_mod)
-                    log += f"💥 致命爆擊！第 {i+1} 擊斬出 {d} 點爆擊物理傷害！\n"
-                else:
-                    log += f"⚔️ 第 {i+1} 擊普通命中，造成 {d} 點物理傷害！\n"
-                total_p_dmg += d
+            is_double = random.random() < (double_chance / 100.0)
+            is_crit = random.random() < (crit_chance / 100.0)
+            
+            base_dmg = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
+            
+            if is_crit:
+                base_dmg = int(base_dmg * 1.5)
+                log += "✨ 【致命爆擊】！"
+                
+            total_p_dmg = base_dmg
+            log += f"⚔️ 普通攻擊命中，造成 {base_dmg} 點物理傷害！\n"
+            
+            if is_double:
+                second_dmg = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
+                if is_crit:
+                    second_dmg = int(second_dmg * 1.5)
+                total_p_dmg += second_dmg
+                log += f"💨 連擊發動！追擊造成 {second_dmg} 點物理傷害！\n"
 
+        # 🎯 物理扣減怪物的生命值值
         enemy["hp"] -= total_p_dmg
-        # ── 5. 戰鬥大獲全勝結算 ──
+        
+        # 🏆 5. 戰鬥獲勝結算
         if enemy["hp"] <= 0:
-            gold_mod = p.get("map_gold_mod", 1.0)
             gold_data = enemy["gold_range"]
+            min_gold, max_gold = gold_data[0], gold_data[1]
+            final_gold = random.randint(min_gold, max_gold)
             
-            # ✨ 【Bug 完美校正】當 gold_data 是列表時，精準抓取 0 位與 1 位，彻底消滅 'list' TypeError 閃退！
-            min_gold = int(gold_data[0]) if isinstance(gold_data, (tuple, list)) else int(gold_data)
-            max_gold = int(gold_data[1]) if isinstance(gold_data, (tuple, list)) else int(gold_data)
-            final_gold = int(random.randint(min_gold, max_gold) * gold_mod)
-            p["gold"] += final_gold; p["exp"] += enemy["exp"]
+            p["gold"] += final_gold
+            p["exp"] += enemy["exp"]
+            p["mp"] = min(calculated_max_mp, p.get("mp", 0) + 25)  # 戰勝回藍 25 點
+            p["enemy"] = None
             
-            p["mp"] = min(calculated_max_mp, p["mp"] + 25) 
-            log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力恢復 +25 點。\n"
+            log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥吐納恢復 25 點魔力！"
             
+            # 💎 5% 機率掉落區域專屬神兵利器
             if random.random() < 0.05:
-                current_loc = p.get("current_map", "新手村")
-                matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if current_loc[:2] in w_name or (current_loc == "新手村" and "新手" in w_name)]
+                matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if current_location[:2] in w_name or (current_location == "新手村" and "新手" in w_name)]
                 if matched_weapons:
                     drop_w = random.choice(matched_weapons)
-                    import forge_system
                     forge_system.add_to_weapon_inventory(p, drop_w)
-                    log += f"💎 🔥 🗺️ 【神裝降臨・直接入庫】 🗺️ 🔥 💎\n你擊敗魔物搜刮戰場，驚喜搜刮到了該區域的專屬神兵 ── ⚔️【{drop_w}】！\n📦 存放去向：寶物已為您送入【我的背包】裝備收藏庫，快去開包更換吧！\n"
+                    log += f"\n💎 🔥 【神裝降臨・直接入庫】 💎 🔥\n驚喜搜刮到了該區域專屬神兵 ── ⚔️【{drop_w}】！"
 
-            raw_monster_name = enemy["name"]
-            if "地獄紅蓮巨龍" in raw_monster_name or "邪神克蘇魯" in raw_monster_name:
-                notice_system.push_world_boss_broadcast(raw_monster_name, configuration)
-                log += f"\n👑 🏆 諸神見證！首殺捷報已推播給全服所有玩家！"
-
-            p["enemy"] = None
-            if random.random() < 0.50 and enemy.get("drop_item"):
-                bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
-                log += f"💎 【幸運掉寶】！素材：【{enemy['drop_item']}】x1！\n"
-                
-            is_job_locked = jobs_system.check_level_lock(p, job_mod)
-            p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
+            # 驗證等級天賦界限鎖
+            jobs_system.check_level_lock(p, job_mod)
             db_core.save_player(p)
             
             card_data = db_core.make_battle_card(log, p, None)
-            msg_payload = {
-                "replyToken": event.reply_token,
-                "messages": [{
-                    "type": "flex", 
-                    "altText": "戰鬥結束", 
-                    "contents": card_data["flex"], 
-                    "quickReply": card_data["quick_reply"].to_dict() if hasattr(card_data["quick_reply"], "to_dict") else card_data["quick_reply"]
-                }]
-            }
-            if is_job_locked:
-                msg_payload["messages"].append({"type": "text", "text": f"🔒 【天賦界限卡關中】\n勇者！你目前已達到了 Lv.{p['level']} 的天賦瓶頸，必須完成天賦轉職才能繼續獲取經驗！\n\n{jobs.get_job_options_text(p)}"})
-                
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-                
-        else:
-            # ── 6. 怪物殘存與環境反擊 ──
-            env_str = enemy.get("env", "")
-            if "暴雨滂沱" in env_str: vit_val = int(vit_val * 0.8)
-            if "精神污染" in enemy.get("skill", ""): p["mp"] = max(0, p["mp"] - 20); log += f"\n👁️ 🚨 邪神被動【精神污染】！魔力值被吸走 20 點！"
+            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "戰鬥結束", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+            with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+            return
 
+        # 🩹 6. 敵方回合：魔物反擊運算
+        else:
             final_m_atk = random.randint(1, enemy["atk"])
             p_def = int((vit_val // 2) * p_defense_multiplier)
             dmg_received = max(1, final_m_atk - p_def)
+            
             p["hp"] = max(0, p["hp"] - dmg_received)
             log += f"\n🩹 【{enemy['name']}】發動殘暴反擊！你受到 {dmg_received} 點物理傷害！"
             
+            # 勇者不幸陣亡
             if p["hp"] <= 0:
-                p["enemy"] = None; log += "\n💀 你受傷過重陣亡了！請點擊底部【😇 祈求復活】按鈕。"
-                db_core.save_player(p); card_data = db_core.make_battle_card(log, p, None)
-            else:
-                db_core.MEMORY_PLAYERS[event.source.user_id] = p; card_data = db_core.make_battle_card(log, p, enemy)
+                p["enemy"] = None
+                log += "\n💀 你受傷過重不幸陣亡了！請點擊底部【😇 祈求復活】法陣重鑄靈魂。"
                 
-            msg_payload = {
-                "replyToken": event.reply_token,
-                "messages": [{
-                    "type": "flex", 
-                    "altText": "戰鬥回合", 
-                    "contents": card_data["flex"], 
-                    "quickReply": card_data["quick_reply"].to_dict() if hasattr(card_data["quick_reply"], "to_dict") else card_data["quick_reply"]
-                }]
-            }
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-                
-    else:
-        card_data = db_core.make_battle_card("💡 系統提示：請利用螢幕最下方可以左右橫向滑動的小圖標，直接點擊按鈕來展開您的冒險旅程！", p, None)
-        msg_payload = {
-            "replyToken": event.reply_token,
-            "messages": [{
-                "type": "flex", 
-                "altText": "冒險導引", 
-                "contents": card_data["flex"], 
-                "quickReply": card_data["quick_reply"].to_dict() if hasattr(card_data["quick_reply"], "to_dict") else card_data["quick_reply"]
-            }]
-        }
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+            db_core.save_player(p)
+            
+            card_data = db_core.make_battle_card(log, p, enemy)
+            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "戰鬥回合", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+            with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+            return
