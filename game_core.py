@@ -196,34 +196,31 @@ def process_game_logic(event, line_bot_api, configuration):
             res = challenge_system.execute_world_boss_raid(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
             with ApiClient(configuration) as api_client: 
-                # ⭕ 正確修復：將 API 發送代碼內縮 4 個空格，包在 with 的肚子裡
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
             
         elif user_msg in ("鍛造工坊", "鍛造", "工坊"):
             card_data = forge_system.get_forge_menu(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-            with ApiClient(configuration) as api_client: 
-                # ⭕ 正確修復：將 API 發送代碼內縮 4 個空格，包在 with 的肚子裡
+            with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
             
         elif user_msg.startswith("鍛造"):
             res = forge_system.execute_forge_weapon(p, user_msg)
-            if isinstance(res, str): 
+            if isinstance(res, str):
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
             else:
                 msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "工坊熔煉結果", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
-                with ApiClient(configuration) as api_client: 
-                    # ⭕ 正確修復：將 API 發送代碼內縮 4 個空格，包在 with 的肚子裡
+                with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
             
         elif user_msg in ("尋找怪物", "尋怪", "攻擊", "使用技能"):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
             return
-
-    # 🌲 3. 處於野外危險區的指令導流 (退回一格縮排，與 if current_loc == "主城" 對齊)
+            
+    # 🌲 3. 處於野外危險區的指令導流 (退回四格，與 if current_loc == "主城" 的層級完全對齊)
     if user_msg.startswith("轉職"):
         jobs_system.handle_job_transfer(event, line_bot_api, p, user_msg, configuration)
         return
