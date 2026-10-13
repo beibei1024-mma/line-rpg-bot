@@ -1,63 +1,101 @@
 import random
-from player import get_player_battle_stats, save_player_battle_stats
-from monsters import get_monster_by_id
-from bag import add_item_to_bag, add_weapon_to_bag
+from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient, BroadcastRequest
+from linebot.models import TextSendMessage, FlexSendMessage
 
-def execute_battle(user_id, monster_id):
-    # 優化：先在迴圈外載入玩家與怪物資料，避免戰鬥過程中重複存取或用迴圈查找
-    player = get_player_battle_stats(user_id)
-    monster = get_monster_by_id(monster_id)
-    if not player or not monster:
-        return "戰鬥初始化失敗。"
+import db_core
+import monsters
+import weapons
+import bag
+import jobs
+import jobs_system
+import notice_system
+import forge_system
 
-    p_hp = player["max_hp"] + player["equip_hp"]
-    p_atk = player["atk"] + player["equip_atk"]
-    p_def = player["def"] + player["equip_def"]
+def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
+    """【純粹戰鬥計算機 v2.5】"""
     
-    m_hp = monster["hp"]
-    m_atk = monster["atk"]
-    m_def = monster["def"]
+    # ⚡ 核心修復：將 player 的引用函數改為此處動態載入，徹底消滅日誌中的 ImportError 循環匯入閃退！
+    from player import get_player_battle_stats, save_player_battle_stats
     
-    battle_log = [f"⚔️ 遇到【{monster['name']}】！開始戰鬥！"]
-    round_count = 0
+    level = p.get("level", 1)
+    current_job = p.get("job", "初心者")
+    if current_job not in jobs.JOBS_DATA: current_job = "初心者"
+    job_mod = jobs.JOBS_DATA[current_job]
+
+    # 六大屬性初始化
+    base_str = p.get("strength", 10 + (level * 3))
+    base_agi = p.get("agility", 10 + (level * 2))
+    base_int = p.get("intelligence", 10 + (level * 2))
+    base_vit = p.get("vitality", 10 + (level * 3))
+    base_luk = p.get("luck", 10 + (level * 1))
+    base_men = p.get("sprit", 10 + (level * 2))
     
-    # 戰鬥核心迴圈優化：移除內部無用的狀態判斷，只做核心數值扣減
-    while p_hp > 0 and m_hp > 0 and round_count < 30:
-        round_count += 1
-        
-        # 玩家回合
-        p_dmg = max(1, p_atk - m_def)
-        m_hp -= p_dmg
-        battle_log.append(f"第 {round_count} 回合：你對【{monster['name']}】造成 {p_dmg} 點傷害。")
-        if m_hp <= 0:
-            break
+    str_val = int(base_str * job_mod["str_mod"])
+    agi_val = int(base_agi * job_mod["agi_mod"])
+    int_val = int(base_int * job_mod["int_mod"])
+    vit_val = int(base_vit * job_mod["vit_mod"])
+    luk_val = int(base_luk * job_mod["luk_mod"])
+    men_val = int(base_men * job_mod["men_mod"])
+    
+    calculated_max_mp = 50 + (men_val * 4) + (level * 5)
+    if p.get("mp") is None: p["mp"] = calculated_max_mp
+
+    # 讀取武器與手工裝備附加屬性
+    current_weapon = p.get("weapon", "赤手空拳")
+    w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
+    w_bonus += int(p.get("forge_weapon_bonus", 0))
+
+    # 1. 轉職卡關防呆
+    if (p["level"] == 25 and job_mod["tier"] == 0) or (p["level"] == 50 and job_mod["tier"] == 1) or (p["level"] == 100 and job_mod["tier"] == 2):
+        if user_msg in ("攻擊", "使用技能") or user_msg.startswith("使用技能"):
+            job_notice = jobs.get_job_options_text(p)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔒 【天賦界限卡關中】請先完成手動天賦轉職！\n\n{job_notice}"))
+            return
+
+    # 2. 🔍 尋找怪物處理
+    if user_msg in ("尋找怪物", "尋怪"):
+        if p["hp"] <= 0:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊底部【😇 祈求復活】按鈕。"))
+            return
+        if p["enemy"] is not None:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚔️ 眼前還有怪物！請發動【攻擊】或施放職業技能！"))
+            return
+        current_location = p.get("current_map", "新手村")
+        random_monster = monsters.generate_random_monster(current_location)
+        p["enemy"] = random_monster
+        db_core.save_player(p)
+        title_log = f"⚠️ 遭遇強敵！在📍【{current_location}】撞見了對手！\n\n📢 環境狀態：{random_monster['env']}\n🔰 怪物被動：{random_monster['skill']}"
+        card_data = db_core.make_battle_card(title_log, p, random_monster)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "遭遇怪物", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
+
+    # 3. 🏃 逃跑扣罰與博弈機制
+    elif user_msg == "逃跑":
+        if p["enemy"] is None:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 周圍沒有怪物，你不需要逃跑。"))
+            return
+        enemy = p["enemy"]
+        if random.random() < 0.30:
+            p_def = vit_val // 2
+            backlash_dmg = max(1, (random.randint(1, enemy["atk"]) - p_def) * 2)
+            p["hp"] = max(0, p["hp"] - backlash_dmg)
+            log = f"🏃 ❌ 逃跑失敗！你露出了巨大的破綻，遭到【{enemy['name']}】憤怒的背後致命重擊，受到雙倍傷害 -{backlash_dmg} 點！"
+            if p["hp"] <= 0:
+                p["enemy"] = None
+                log += "\n💀 你受傷過重在逃跑途中陣亡了！"
+                db_core.save_player(p)
+                card_data = db_core.make_battle_card(log, p, None)
+            else:
+                db_core.save_player(p)
+                card_data = db_core.make_battle_card(log, p, enemy)
+        else:
+            p["gold"] = max(0, p["gold"] - 10)
+            p["enemy"] = None
+            db_core.save_player(p)
+            log = f"🏃 💨 逃跑成功！你慌忙丟下了 🪙 10 金幣引開注意，狼狽地逃離了戰場！"
+            card_data = db_core.make_battle_card(log, p, None)
             
-        # 怪物回合
-        m_dmg = max(1, m_atk - p_def)
-        p_hp -= m_dmg
-        battle_log.append(f"第 {round_count} 回合：【{monster['name']}】對你造成 {m_dmg} 點傷害。")
-
-    if m_hp <= 0:
-        battle_log.append(f"🎉 戰鬥勝利！獲得經驗值 {monster['exp']}，金幣 {monster['gold']}。")
-        # 掉落物處理迴圈優化：改用直觀的條件檢查，去除多層 nested 結構
-        rewards_text = []
-        for drop in monster.get("drops", []):
-            if random.random() <= drop["rate"]:
-                if drop["type"] == "item":
-                    add_item_to_bag(user_id, drop["id"], 1)
-                elif drop["type"] == "weapon":
-                    add_weapon_to_bag(user_id, drop["id"], 1)
-                rewards_text.append(f"{drop['name']}x1")
-        
-        if rewards_text:
-            battle_log.append(f"🎁 獲得掉落物：{', '.join(rewards_text)}")
-            
-        save_player_battle_stats(user_id, monster["exp"], monster["gold"], p_hp)
-    elif p_hp <= 0:
-        battle_log.append("💀 你被擊敗了...（體力恢復至 20%）")
-        save_player_battle_stats(user_id, 0, 0, int(player["max_hp"] * 0.2))
-    else:
-        battle_log.append("⏳ 戰鬥平手，不分勝負。")
-        save_player_battle_stats(user_id, 0, 0, p_hp)
-        
-    return "\n".join(battle_log)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "逃跑結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
