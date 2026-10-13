@@ -119,7 +119,7 @@ def process_game_logic(event, line_bot_api, configuration):
     if p["enemy"] is not None:
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
         return
-        if user_msg == "挑戰爬塔":
+        elif user_msg == "挑戰爬塔":
             res = challenge_system.execute_tower_climb(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "試煉戰況", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
             with ApiClient(configuration) as api_client:
