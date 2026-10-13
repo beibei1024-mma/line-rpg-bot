@@ -108,13 +108,13 @@ def execute_tower_climb(p):
         return {"text": reply_text, "is_flex": True, "flex": db_core.make_battle_card(reply_text, p, None)["flex"], "quick_reply": qr_object}
 
 def execute_world_boss_raid(p):
-    """世界 Boss 戰功結算，動態統計全服總傷害生成血條，並拉取前5名戰功排行榜"""
+    """世界 Boss 戰功結算，動態統計全服總傷害生成血條，並拉取前 5 名【真實姓名】排行榜"""
     if p["hp"] <= 0:
         card = db_core.make_battle_card("❌ 你已陣亡，無法向世界魔神發起衝鋒！", p, None)
         return {"text": "❌ 已陣亡！", "is_flex": True, "flex": card["flex"], "quick_reply": card["quick_reply"]}
         
     current_weapon = p.get("weapon", "赤手空拳")
-    w_bonus = weapons.SHOP_WEAspects = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
+    w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
     p_atk = 20 + (p.get("strength", 10) * 2) + (p.get("intelligence", 10) * 2) + w_bonus
     
     raid_damage = int(p_atk * random.uniform(1.5, 4.0))
@@ -122,17 +122,18 @@ def execute_world_boss_raid(p):
     p["hp"] = max(1, p["hp"] - random.randint(20, 50))
     db_core.save_player(p)
     
-    # 🌟 【排行榜與總血量核心管線】直接從 Supabase 即時加總全服所有勇者的傷害
+    # 直接從 Supabase 即時加總全服所有勇者的傷害與真實名字
     conn = db_core.get_db_connection()
     cur = conn.cursor()
     
     # 1. 撈取全服總傷害以動態換算 Boss 剩餘血量
     cur.execute("SELECT SUM(COALESCE(world_boss_damage, 0)) FROM players")
-    server_total_damage = cur.fetchone()[0] or 0
+    res = cur.fetchone()
+    server_total_damage = res[0] if res and res[0] is not None else 0
     boss_current_hp = max(0, WORLD_BOSS_TOTAL_HP - server_total_damage)
     
-    # 2. 🔥【排行榜實裝】撈取全服貢獻排名前 5 名的玩家
-    cur.execute("SELECT user_id, job, level, COALESCE(world_boss_damage, 0) FROM players WHERE world_boss_damage > 0 ORDER BY world_boss_damage DESC LIMIT 5")
+    # 2. 🔥【傳奇真名排行榜實裝】改為撈取 name 欄位，徹底抹除冷冰冰的 user_id
+    cur.execute("SELECT name, job, level, COALESCE(world_boss_damage, 0) FROM players WHERE world_boss_damage > 0 ORDER BY world_boss_damage DESC LIMIT 5")
     leaderboard_rows = cur.fetchall()
     
     cur.close()
@@ -141,10 +142,9 @@ def execute_world_boss_raid(p):
     # 3. 組合排行榜文字
     lb_lines = ["\n📊 【 🏆 皇家討伐戰功世界排行榜 🏆 】"]
     for idx, row in enumerate(leaderboard_rows, 1):
-        uid, job, lvl, dmg = row
-        # 隱碼保護 UID
-        short_id = f"勇者*{str(uid)[-4:]}" if len(str(uid)) >= 4 else f"勇者{idx}"
-        lb_lines.append(f" 🥇 第 {idx} 名：{short_id} ({job} Lv.{lvl}) ➡️ ⚔️ {dmg} 點")
+        real_name, job, lvl, dmg = row
+        # 顯示勇者設定的真名！
+        lb_lines.append(f" 👑 第 {idx} 名：【 {real_name} 】 ({job} Lv.{lvl}) ➡️ ⚔️ {dmg} 點")
     if len(leaderboard_rows) == 0:
         lb_lines.append("   (目前尚無勇者登榜，快拿測試神兵砍下一刀！)")
         
@@ -152,7 +152,7 @@ def execute_world_boss_raid(p):
     
     reply_text = f"🌋 🔥 【世界 Boss 滅世突襲戰】 🔥 🌋\n─────────────────\n🛡️ 你發動全盛奧義，朝 {WORLD_BOSS_NAME} 揮出極限一擊！\n\n💥 本回合灌入傷害：【 ⚔️ {raid_damage} 點 】！\n🩹 承受魔神威壓反噬，體力扣減！\n{leaderboard_text}"
     
-    # 封裝一個虛擬怪物包丟給 db_core，讓其強行渲染出 Boss 血條與數值
+    # 封裝虛擬魔王封包丟給 db_core 強行渲染長血條與實體數值
     boss_fake_monster = {
         "name": WORLD_BOSS_NAME,
         "hp": boss_current_hp,
