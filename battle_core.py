@@ -245,7 +245,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 db_core.save_player(p)
                 card_data = db_core.make_battle_card(log, p, None)
             else:
-                db_core.MEMORY_PLAYERS[event.source.user_id] = p
+                db_core.save_player(p)
                 card_data = db_core.make_battle_card(log, p, enemy)
                 
             msg_payload = {
