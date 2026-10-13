@@ -16,6 +16,7 @@ SHOP_ITEMS = {
     "微光木藤弓": {"type": "weapon", "price": 800, "desc": "物傷 +45。森林老獵人常用的木弓。"},
     "凜冬不融碎冰刺": {"type": "weapon", "price": 2500, "desc": "物傷 +95。散發著淡淡寒氣的冰刺。"},
     "黑曜熔岩大劍": {"type": "weapon", "price": 6000, "desc": "物傷 +160。黑曜石打造，揮砍帶有熱浪。"}
+    "GM滅世制裁之劍": {"type": "weapon", "price": 10, "desc": "物傷 +160。開發者測試專用，一刀秒殺萬物。"}
 }
 
 def get_shop_card(p):
