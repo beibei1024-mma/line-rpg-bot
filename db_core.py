@@ -4,16 +4,14 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
-MEMORY_PLAYERS = {}
+# ⭕ 終極修復：廢除會導致資料重置、坐標被舊快取覆蓋的 MEMORY_PLAYERS 機制，全線走即時 Supabase 讀寫！
 _db_pool_url = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
     return psycopg2.connect(_db_pool_url)
 
 def load_player(user_id):
-    if user_id in MEMORY_PLAYERS:
-        return MEMORY_PLAYERS[user_id]
-        
+    """即時雲端加載：每一次動作都去 Supabase 撈取最精準的 14 欄位裝備與 current_map 坐標"""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -21,7 +19,6 @@ def load_player(user_id):
         player = cur.fetchone()
         
         if not player:
-            # 📌 預設新增勇者時，同步賦予基礎的 14 大格子初始換裝預設值
             cur.execute(
                 "INSERT INTO players (user_id, name, hp, max_hp, level, exp, gold, weapon, helmet, armor, pants, shoes, necklace, ring1, ring2, bracelet, sub_hand, badge, cash_item1, cash_item2, cash_item3, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points, last_sign_in, current_map, current_city) VALUES (%s, '新進勇者', 100, 100, 1, 0, 0, '赤手空拳', '冒險者頭巾', '冒險者皮甲', '冒險者布長褲', '冒險者草鞋', '無', '無', '無', '無', '無', '無', '無', '無', '無', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0, 'None', '主城', '新手村')",
                 (user_id,)
@@ -34,25 +31,26 @@ def load_player(user_id):
         conn.close()
         
     if player:
-        if player['enemy']: 
-            player['enemy'] = json.loads(player['enemy'])
-        MEMORY_PLAYERS[user_id] = dict(player)
-        return MEMORY_PLAYERS[user_id]
+        # 強制將資料表唯讀的字典轉換為可修改的實體 dict
+        p_dict = dict(player)
+        if p_dict.get('enemy'): 
+            try: p_dict['enemy'] = json.loads(p_dict['enemy'])
+            except: p_dict['enemy'] = None
+        return p_dict
     return None
 
 def save_player(p):
+    """即時雲端儲存：將變更完畢的數值即時寫入 Supabase，絕不殘留舊數據"""
     user_id = p['user_id']
-    MEMORY_PLAYERS[user_id] = p
     
     conn = get_db_connection()
     cur = conn.cursor()
     try:
         enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
-        # 📌 ⭕ 終極修復點：將 14 大新裝備格子全部納入 UPDATE 指令中，並讓後方的 Python 變數陣列與 SQL 欄位完全「一對一精準對齊」，粉碎錯位卡死魔咒！
         cur.execute(
             "UPDATE players SET name=%s, hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, helmet=%s, armor=%s, pants=%s, shoes=%s, necklace=%s, ring1=%s, ring2=%s, bracelet=%s, sub_hand=%s, badge=%s, cash_item1=%s, cash_item2=%s, cash_item3=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s, last_sign_in=%s, current_map=%s, current_city=%s WHERE user_id=%s",
             (p.get('name', '新進勇者'), p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'],
-             p.get('helmet', '冒險者頭巾'), p.get('armor', '冒險者皮甲'), p.get('pants', '冒險者布長褲'), p.get('shoes', '冒險者草鞋'),
+             p.get('helmet', '冒險者頭巾'), p.get('armor', '冒險者皮甲'), p.get('pants', '冒險者布長長褲'), p.get('shoes', '冒險者草鞋'),
              p.get('necklace', '無'), p.get('ring1', '無'), p.get('ring2', '無'), p.get('bracelet', '無'),
              p.get('sub_hand', '無'), p.get('badge', '無'), p.get('cash_item1', '無'), p.get('cash_item2', '無'), p.get('cash_item3', '無'),
              enemy_str, p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p.get('last_sign_in', 'None'), p.get('current_map', '主城'), p.get('current_city', '新手村'), user_id)
