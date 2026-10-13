@@ -17,7 +17,7 @@ from linebot.models import TextSendMessage, FlexSendMessage
 CITY_ONLY_COMMANDS = {"冒險商店", "購買", "簽到", "挑戰", "挑戰爬塔", "挑戰世界Boss", "世界Boss", "工坊", "鍛造"}
 
 def process_game_logic(event, line_bot_api, configuration):
-    """【皇家分流主控台 屬性配點解鎖版】全新實裝獨立加點管線，徹底封印配點卡死死角"""
+    """【皇家分流主控台 勇者取名解鎖版】全新實裝獨立取名/改名管線與配點管線"""
     user_id = event.source.user_id
     user_msg = event.message.text.replace(" ", "").strip()
     
@@ -67,10 +67,29 @@ def process_game_logic(event, line_bot_api, configuration):
             MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # ✨ 【Bug 終極封印點】全新解鎖獨立的【屬性加點 / 配點】管線大腦！直接在中央路由攔截核算！
+    # 👑 【全新解鎖：自訂姓名管線】支援「取名 XXX」或「改名 XXX」格式，字數防呆限 2~12 字
+    elif user_msg.startswith("取名") or user_msg.startswith("改名"):
+        new_name = user_msg.replace("改名", "").replace("取名", "").strip()
+        
+        if len(new_name) < 2 or len(new_name) > 12:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 取名失敗！名字長度必須限制在 2 ~ 12 個字元之內！"))
+            return
+            
+        old_name = p.get("name", "新進勇者")
+        p["name"] = new_name
+        db_core.save_player(p)
+        
+        reply_log = f"📜 ✨ 【 勇者本名登錄成功 】 ✨ 📜\n─────────────────\n冒險者公會羊皮紙上的魔法契約已更新！\n\n👤 舊有名號：{old_name}\n🔥 榮耀新名：【 {new_name} 】\n\n📈 威名遠播：您在世界頻道、全服戰功排行榜及狀態卡片上的尊稱已全數即時生效！"
+        card_data = db_core.make_battle_card(reply_log, p, p["enemy"])
+        
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "取名成功", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client: 
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
+
+    # ✨ 【屬性配點】管線
     elif user_msg.startswith("加點") or user_msg.startswith("配點"):
         clean_cmd = user_msg.replace("配點", "加點")
-        
         attr_name = clean_cmd.replace("加點", "")[:2]
         pts_str = clean_cmd.replace("加點", "")[2:]
         
@@ -95,22 +114,13 @@ def process_game_logic(event, line_bot_api, configuration):
         p["attribute_points"] = free_pts - pts_to_add
         db_core.save_player(p)
         
-        reply_log = f"💪 【 屬性配點成功 】 💪\n─────────────────\n你引引導了體內的遠古潛能，將 {pts_to_add} 點剩餘點數分配給了 ── ✨【 {attr_name} 】屬性！\n\n📈 能力激發：該屬性已實體在後台暴漲！輸入【我的狀態】即可查閱全新的橫向網格數值面板！"
+        reply_log = f"💪 【 屬性配點成功 】 💪\n─────────────────\n你引導了體內的遠古潛能，將 {pts_to_add} 點剩餘點數分配給了 ── ✨【 {attr_name} 】屬性！\n\n📈 能力激發：該屬性已實體在後台暴漲！輸入【我的狀態】即可查閱全新的數值面板！"
         card_data = db_core.make_battle_card(reply_log, p, p["enemy"])
         
-        msg_payload = {
-            "replyToken": event.reply_token,
-            "messages": [{
-                "type": "flex", 
-                "altText": "屬性配點結果", 
-                "contents": card_data["flex"], 
-                "quickReply": card_data["quick_reply"]
-            }]
-        }
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "屬性配點結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: 
             MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
-
     # ⚔️ 處理【使用技能】
     elif user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
@@ -143,7 +153,6 @@ def process_game_logic(event, line_bot_api, configuration):
         return
 
     # 🔒 城市專屬鎖死功能安全隔離牆
-    # ⚡ 優化：利用 set 的 O(1) 特性，結合 Generator 快速完成命令過濾
     is_city_cmd = any(user_msg.startswith(cmd) or user_msg == cmd for cmd in CITY_ONLY_COMMANDS)
     
     if is_city_cmd and current_loc != "主城":
@@ -187,37 +196,32 @@ def process_game_logic(event, line_bot_api, configuration):
             with ApiClient(configuration) as api_client: 
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
-        # ── 續接第一部分：處於主城安全區內的指令導流 (接續 if current_loc == "主城" 的縮排) ──
         elif user_msg in ("挑戰世界Boss", "世界Boss"):
             res = challenge_system.execute_world_boss_raid(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
             with ApiClient(configuration) as api_client: 
-                # ── ⭕ 精準接續第一部分最尾端漏掉的 with 肚子動作 (維持 16 格縮排) ──
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
-            
         elif user_msg in ("鍛造工坊", "鍛造", "工坊"):
             card_data = forge_system.get_forge_menu(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-            with ApiClient(configuration) as api_client:
+            with ApiClient(configuration) as api_client: 
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
-            
         elif user_msg.startswith("鍛造"):
             res = forge_system.execute_forge_weapon(p, user_msg)
-            if isinstance(res, str):
+            if isinstance(res, str): 
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
             else:
                 msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "工坊熔煉結果", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
-                with ApiClient(configuration) as api_client:
+                with ApiClient(configuration) as api_client: 
                     MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
-            
         elif user_msg in ("尋找怪物", "尋怪", "攻擊", "使用技能"):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
             return
-            
-    # 🌲 3. 處於野外危險區的指令導流 (退回 4 格，與主控台頂層 if 對齊)
+
+    # 🌲 3. 處於野外危險區的指令導流
     if user_msg.startswith("轉職"):
         jobs_system.handle_job_transfer(event, line_bot_api, p, user_msg, configuration)
         return
