@@ -10,9 +10,11 @@ import jobs
 import jobs_system
 import notice_system
 import forge_system
+# 🌟 核心引入：連通全新抽離的技能獨立大腦，維持最高併發扁平化管線
+import skills_calculator
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【純粹戰鬥計算機 v2.8 KeyError修正版】"""
+    """【純粹戰鬥計算機 v3.0 技能樹解耦完全體】"""
     
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
@@ -31,7 +33,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
     agi_val = int(base_agi * job_mod["agi_mod"])
     int_val = int(base_int * job_mod["int_mod"])
     vit_val = int(base_vit * job_mod["vit_mod"])
-    # ⭕ 核心修復：將 job_mod["luck_mod"] 修正為 jobs.py 定義的正確名稱 job_mod["luk_mod"]，徹底封印 KeyError！
     luk_val = int(base_luk * job_mod["luk_mod"])
     men_val = int(base_men * job_mod["men_mod"])
     
@@ -133,54 +134,19 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             p["mp"] = safe_mp - mp_cost
             log += f"🔮 奧義發動！你消耗了 🔷 {mp_cost} 點 MP 施放秘術 ── ⚡【{skill_name}】！\n"
             
-            base_weapon_atk = 12 + str_val + w_bonus
-            
-            # 技能映射樹扁平化
-            if skill_name == "蓄力重擊": total_p_dmg = int(base_weapon_atk * 1.5)
-            elif skill_name == "橫掃千軍": total_p_dmg = int(base_weapon_atk * 1.8) + 50
-            elif skill_name == "戰吼震懾": total_p_dmg = int(base_weapon_atk * 1.3) + 100
-            elif skill_name == "破甲一擊": total_p_dmg = int(base_weapon_atk * 2.2) + 150
-            elif skill_name == "血性狂暴": total_p_dmg = int(base_weapon_atk * 2.9) + 300
-            elif skill_name == "旋風斬": total_p_dmg = int(base_weapon_atk * 3.4) + 450
-            elif skill_name == "怒火重擊": total_p_dmg = int(base_weapon_atk * 4.0) + 600
-            elif skill_name == "阿修羅霸凰拳": total_p_dmg = int(base_weapon_atk * 6.5) + 1200
-            elif skill_name == "百裂拳": total_p_dmg = int(base_weapon_atk * 4.8) + 800
-            elif skill_name == "虎咆爪": total_p_dmg = int(base_weapon_atk * 5.3) + 950
-            elif skill_name == "盾擊": total_p_dmg = int((12 + vit_val + w_bonus) * 1.4)
-            elif skill_name == "神聖之光": total_p_dmg = int((10 + int_val) * 1.6) + 40
-            elif skill_name == "神聖盾擊": total_p_dmg = int((12 + vit_val + w_bonus) * 2.6) + 200
-            elif skill_name == "審判聖刃": total_p_dmg = int((10 + int_val) * 3.2) + 400
-            elif skill_name == "正義裁決": total_p_dmg = int((12 + vit_val + str_val) * 4.8) + 900
-            elif skill_name == "魔能彈": total_p_dmg = int((10 + int_val) * 1.3)
-            elif skill_name == "火球術": total_p_dmg = int((10 + int_val) * 2.0) + 60
-            elif skill_name == "閃電術": total_p_dmg = int((10 + int_val) * 2.4) + 110
-            elif skill_name == "奧術飛彈": total_p_dmg = int((10 + int_val) * 2.7) + 160
-            elif skill_name == "元素暴風": total_p_dmg = int((10 + int_val) * 3.6) + 400
-            elif skill_name == "冰凍術": total_p_dmg = int((10 + int_val) * 3.0) + 300
-            elif skill_name == "魔力燃燒": total_p_dmg = int((10 + int_val) * 3.3) + 350
-            elif skill_name == "極凍終焉": total_p_dmg = int((10 + int_val) * 5.8) + 1000
-            elif skill_name == "末日流星": total_p_dmg = int((10 + int_val) * 6.6) + 1300
-            elif skill_name == "雷神之怒": total_p_dmg = int((10 + int_val) * 5.0) + 850
-            elif skill_name == "背刺": total_p_dmg = int((12 + agi_val + w_bonus) * 1.6)
-            elif skill_name == "毒刃襲擊": total_p_dmg = int((12 + agi_val + w_bonus) * 2.3) + 100
-            elif skill_name == "影分身": total_p_dmg = int((12 + agi_val + w_bonus) * 3.4) + 350
-            elif skill_name == "弒神終結": total_p_dmg = int((12 + agi_val + luk_val + w_bonus) * 5.6) + 900
-            elif skill_name == "瞬獄殺": total_p_dmg = int((12 + agi_val + w_bonus) * 6.3) + 1200
-            elif user_msg == "使用技能二連矢": total_p_dmg = int((12 + agi_val + w_bonus) * 1.7) + 40
-            elif skill_name == "狙擊一擊": total_p_dmg = int((12 + agi_val + w_bonus) * 2.5) + 200
-            elif skill_name == "爆影狂襲": total_p_dmg = int((12 + agi_val + w_bonus) * 3.3) + 400
-            elif skill_name == "暴風萬箭破": total_p_dmg = int((12 + agi_val + luk_val + w_bonus) * 5.4) + 1100
-            elif skill_name in ("治癒術", "群體療癒"):
+            # 💖 特殊回血治癒類技能先行在本地攔截
+            if skill_name in ("治癒術", "群體療癒"):
                 heal = int((int_val + men_val) * 2.5)
                 old_h = p["hp"]
-                p["hp"] = min(calculated_max_hp, p["hp"] + heal)
+                p["hp"] = min(100 + (vit_val * 5) + (level * 15), p["hp"] + heal)
                 log += f"💖 聖光治癒！神聖恢復了生命值 +{p['hp'] - old_h} 點！\n"
-                total_p_dmg = int(int_val * 0.8)
-            elif skill_name == "聖光懲戒": total_p_dmg = int((10 + int_val + men_val) * 2.4) + 150
-            elif skill_name == "神神聖讚美詩": total_p_dmg = int((10 + int_val + men_val) * 5.5) + 1000
-            else: total_p_dmg = int((str_val + int_val + agi_val) * 1.5)
-                
-            log += f"💥 重創命中！技能對【{enemy['name']}】造成了 {total_p_dmg} 點實體法術傷害！\n"
+            
+            base_weapon_atk = 12 + str_val + w_bonus
+            # ⚡ 核心解耦：直接調用外部運算大腦，一行搞定傷害結算
+            calc_res = skills_calculator.calculate_active_skill_damage(skill_name, base_weapon_atk, int_val, vit_val, str_val, agi_val, luk_val, men_val)
+            total_p_dmg = calc_res["damage"]
+            log += calc_res["log"].format(enemy_name=enemy["name"])
+            
         else:
             # 普通物理揮刀
             crit_chance = min(80, 10 + (luk_val // 5)) / 100.0          
@@ -243,10 +209,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 
             is_job_locked = jobs_system.check_level_lock(p, job_mod)
             p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
-            
-            # ⭕ 終極修復：移除原先的 player.save_player_battle_stats()，直接改用最穩健的一體化防爆儲存管線
             db_core.save_player(p)
-            
             card_data = db_core.make_battle_card(log, p, None)
             msg_payload = {
                 "replyToken": event.reply_token,
@@ -265,14 +228,17 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 
         else:
             # ── 6. 怪物殘存與環境反擊 ──
-            if "暴雨滂沱" in enemy.get("env", ""): vit_val = int(vit_val * 0.8)
-            if "精神污染" in enemy.get("skill", ""): p["mp"] = max(0, p["mp"] - 20); log += "\n👁️ 🚨 邪神被動【精神污染】！魔力值被吸走 20 點！"
-
+            if "暴雨滂沱" in enemy.get("env", ""): 
+                vit_val = int(vit_val * 0.8)
+            if "精神污染" in enemy.get("skill", ""): 
+                p["mp"] = max(0, p["mp"] - 20)
+                log += "\n👁️ 🚨 邪神被動【精神污染】！魔力值被吸走 20 點！"
+                
             p_def = int((vit_val // 2) * p_defense_multiplier)
             dmg_received = max(1, random.randint(1, enemy["atk"]) - p_def)
             p["hp"] = max(0, p["hp"] - dmg_received)
             log += f"\n🩹 【{enemy['name']}】發動殘暴反擊！你受到 {dmg_received} 點物理傷害！"
-            # ── 續接第二部分：怪物反擊結算與發送 (注意：此段前面固定為 12 個空格縮排) ──
+            
             if p["hp"] <= 0:
                 p["enemy"] = None
                 log += "\n💀 你受傷過重陣亡了！請點擊底部【😇 祈求復活】按鈕。"
@@ -295,7 +261,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
                 
     else:
-        # ── 頂層大架構的 else 分支：當不屬於攻擊、技能等指令時的冒險導引 (退回 4 個空格縮排) ──
         card_data = db_core.make_battle_card("💡 系統提示：請利用螢幕最下方可以左右橫向滑動的小圖標，直接點擊按鈕來展開您的冒險旅程！", p, None)
         msg_payload = {
             "replyToken": event.reply_token,
