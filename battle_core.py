@@ -12,9 +12,7 @@ import notice_system
 import forge_system
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【純粹戰鬥計算機 v2.7 徹底解耦防爆版】"""
-    
-    # ⭕ 終極修復：彻底刪除原先引發循環匯入閃退的 from player import ... 敘述！
+    """【純粹戰鬥計算機 v2.8 KeyError修正版】"""
     
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
@@ -33,7 +31,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
     agi_val = int(base_agi * job_mod["agi_mod"])
     int_val = int(base_int * job_mod["int_mod"])
     vit_val = int(base_vit * job_mod["vit_mod"])
-    luk_val = int(base_luk * job_mod["luck_mod"])
+    # ⭕ 核心修復：將 job_mod["luck_mod"] 修正為 jobs.py 定義的正確名稱 job_mod["luk_mod"]，徹底封印 KeyError！
+    luk_val = int(base_luk * job_mod["luk_mod"])
     men_val = int(base_men * job_mod["men_mod"])
     
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
@@ -98,6 +97,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "逃跑結果", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client: MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
+
     # 4. ⚔️ 核心戰鬥核心公式
     elif user_msg == "攻擊" or user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
         if p["hp"] <= 0 or p["enemy"] is None:
