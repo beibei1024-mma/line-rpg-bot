@@ -1,9 +1,18 @@
 import db_core
 
-# 🌐 完整世界時空廊道資料庫 - 已正式擴建「世界Boss」專屬時空副本
+# 🌐 完整世界時空廊道資料庫 - 已完美對齊原有架構，正式擴建 5 大專屬「刷裝打寶副本」
 MAPS_DATA = {
     "主城": {"level_req": 1, "desc": "🏙️ 皇家安全城鎮。禁止械鬥，聚集了各行各業的 NPC 補給大師。"},
     "世界Boss": {"level_req": 1, "desc": "🌋 遠古禁忌副本。滅世泰坦正盤踞於此！全職業神聖技能已全數解鎖，全服勇者合力圍剿吧！"},
+    
+    # 🔮 傳奇打寶刷裝副本區 (每 20 等一階，主要用於野外尋怪刷稀有素材)
+    "幽冥礦坑[20等副本]": {"level_req": 20, "desc": "⛏️ 20等打寶副本。充斥著怨念骷髏，看守著遠古手工裝備必備的精煉暗鐵礦石！"},
+    "沉沒古船[40等副本]": {"level_req": 40, "desc": "🏴‍☠️ 40等打寶副本。幽靈船長看守著遠古詛咒寶箱，出產中階手工神兵的關鍵淬火核心！"},
+    "不朽王陵[60等副本]": {"level_req": 60, "desc": "👑 60等打寶副本。沉睡的古代君王傀儡巨像，守護著高等裝備必備的帝王金精！"},
+    "天外天境[80等副本]": {"level_req": 80, "desc": "🌌 80等打寶副本。漂浮在星空裂縫中的虛空幻境，出產洗鍊史詩、遠古神話裝備的星海晶核！"},
+    "諸神黃昏[100等副本]": {"level_req": 100, "desc": "🔱 100等終極副本。隕落諸神的破碎神殿，產出至高誓約結晶，是打造毁灭級最終神兵的唯一材料！"},
+    
+    # 🌲 野外普通冒險區
     "新手村": {"level_req": 1, "desc": "🌲 冒險者誕生的小聚落。"},
     "微光森林": {"level_req": 5, "desc": "🌳 螢光菇散落的迷幻之森。"},
     "寒冰極地": {"level_req": 10, "desc": "❄️ 萬年不化的封印雪原。"},
@@ -36,10 +45,11 @@ def get_maps_carousel(p):
         for name, info in chunk:
             if p_level >= info["level_req"]:
                 if name == "主城": btn_color = "#007AFF"
-                elif name == "世界Boss": btn_color = "#FF3B30" # 世界 Boss 副本專屬亮紅色按鈕
+                elif name == "世界Boss": btn_color = "#FF3B30" 
+                elif "副本" in name: btn_color = "#AF52DE" # 🔮 副本專屬璀璨紫色按鈕
                 else: btn_color = "#1478FF"
                 
-                btn_label = f"📍前往 {name}" if name in ("主城", "世界Boss") else f"📍前往 {name} (Lv.{info['level_req']})"
+                btn_label = f"📍前往 {name}" if name in ("主城", "世界Boss") or "副本" in name else f"📍前往 {name} (Lv.{info['level_req']})"
             else:
                 btn_color = "#444444" 
                 btn_label = f"🔒 {name} (需 Lv.{info['level_req']})"
@@ -72,13 +82,13 @@ def change_map(p, target_map):
     if p.get("current_map") == target_map:
         return f"📍 你目前已經在【{target_map}】區域了，不需要重複傳送。"
         
-    # ✨ 核心優化：允許玩家自由離開危險地圖，唯獨身上如果正卡著普通野外小怪才需要防呆
-    if p["enemy"] is not None and p.get("current_map") != "世界Boss":
+    # 允許玩家自由離開副本或危險區域，唯獨身上如果正卡著普通野外小怪才需要防呆
+    if p["enemy"] is not None and p.get("current_map") != "世界Boss" and "副本" not in p.get("current_map", ""):
         return "❌ 傳送失敗！你的眼前還卡著一隻野外怪物，請先打倒牠或選擇【逃跑】後才能引導傳送陣！"
 
     p["current_map"] = target_map
     
-    # 📌 核心更新：如果玩家傳送的地點是世界Boss地圖，進去一落地的瞬間，主控台自動幫他生成魔神怪物實體
+    # 世界 Boss 落地機制自動加載
     if target_map == "世界Boss":
         import challenge_system
         boss_hp = challenge_system.check_boss_rebirth_and_get_hp()
@@ -95,7 +105,7 @@ def change_map(p, target_map):
             "is_world_boss": True
         }
     else:
-        # 如果飛去別的地方，自動卸載世界 Boss 狀態
+        # 如果飛去別的地方（包含副本地圖），自動卸載世界 Boss 狀態，改由尋怪觸發副本魔王
         if p["enemy"] and p["enemy"].get("is_world_boss"):
             p["enemy"] = None
             
