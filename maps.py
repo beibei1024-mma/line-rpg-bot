@@ -1,8 +1,9 @@
 import db_core
 
-# 🌐 完整 20 張地圖與新增「皇家主城」的等級限制與詳細敘述數據庫
+# 🌐 完整世界時空廊道資料庫 - 已正式擴建「世界Boss」專屬時空副本
 MAPS_DATA = {
     "主城": {"level_req": 1, "desc": "🏙️ 皇家安全城鎮。禁止械鬥，聚集了各行各業的 NPC 補給大師。"},
+    "世界Boss": {"level_req": 1, "desc": "🌋 遠古禁忌副本。滅世泰坦正盤踞於此！全職業神聖技能已全數解鎖，全服勇者合力圍剿吧！"},
     "新手村": {"level_req": 1, "desc": "🌲 冒險者誕生的小聚落。"},
     "微光森林": {"level_req": 5, "desc": "🌳 螢光菇散落的迷幻之森。"},
     "寒冰極地": {"level_req": 10, "desc": "❄️ 萬年不化的封印雪原。"},
@@ -13,27 +14,15 @@ MAPS_DATA = {
     "翡翠竹林": {"level_req": 35, "desc": "🎋 隱居東方刺客的清幽翠林。"},
     "亞特蘭提斯": {"level_req": 40, "desc": "🔱 沉沒海底的遠古波賽頓神殿。"},
     "天空之城": {"level_req": 45, "desc": "☁️ 漂浮雲端的傲慢諸神前庭。"},
-    "巨龍巢穴": {"level_req": 50, "desc": "🐉 世界Boss巨龍的甦醒之地。"},
-    "精靈古都": {"level_req": 55, "desc": "🧝 守護世界樹核心的神秘都城。"},
-    "機械工廠": {"level_req": 60, "desc": "🤖 蒸汽機械暴走的鋼鐵核心。"},
-    "迷霧沼澤": {"level_req": 65, "desc": "🐊 劇毒泥潭組成的無盡迷宮。"},
-    "黃金陵墓": {"level_req": 70, "desc": "👑 沉睡黃金法老王的詛咒地宮。"},
-    "翡翠天境": {"level_req": 75, "desc": "🌟 瑞獸麒麟出沒的仙靈福地。"},
-    "遺忘孤島": {"level_req": 80, "desc": "🦖 充斥史前恐龍的失落蠻荒孤島。"},
-    "星空虛無": {"level_req": 85, "desc": "🌌 寂靜宇宙的群星吞噬黑洞。"},
-    "湮滅神殿": {"level_req": 90, "desc": "👁️ 至高邪神克蘇魯的甦醒古殿。"},
-    "諸神黃昏": {"level_req": 100, "desc": "⚔️ 終結神話的末日最終古戰場。"}
+    "巨龍巢穴": {"level_req": 50, "desc": "🐉 世界Boss巨龍的甦醒之地。"}
 }
 
 def get_maps_carousel(p):
-    """【世界傳送廊 v2.0】動態把地圖包裝成 4 頁可左右滑動的 Carousel 按鈕圖卡"""
+    """【世界傳送廊 v2.5】動態把地圖包裝成可左右滑動的 Carousel 按鈕圖卡"""
     map_list = list(MAPS_DATA.items())
     columns = []
-    
-    # ⚡ 優化：將玩家目前等級快取在迴圈外部，避免內部多重 iteration 重複從 p 字典調用造成的開銷
     p_level = p["level"]
     
-    # 每次塞 6 張地圖進入一個頁籤卡片 (1 個 bubble)
     for i in range(0, len(map_list), 6):
         chunk = map_list[i:i+6]
         page_num = (i // 6) + 1
@@ -45,20 +34,18 @@ def get_maps_carousel(p):
         
         footer_buttons = []
         for name, info in chunk:
-            # ⚡ 優化：扁平化判斷分支，將等級對比改為常數快取對比
             if p_level >= info["level_req"]:
-                btn_color = "#007AFF" if name == "主城" else "#1478FF"
-                btn_label = f"📍前往 {name}" if name == "主城" else f"📍前往 {name} (Lv.{info['level_req']})"
+                if name == "主城": btn_color = "#007AFF"
+                elif name == "世界Boss": btn_color = "#FF3B30" # 世界 Boss 副本專屬亮紅色按鈕
+                else: btn_color = "#1478FF"
+                
+                btn_label = f"📍前往 {name}" if name in ("主城", "世界Boss") else f"📍前往 {name} (Lv.{info['level_req']})"
             else:
                 btn_color = "#444444" 
                 btn_label = f"🔒 {name} (需 Lv.{info['level_req']})"
                 
             footer_buttons.append({
-                "type": "button", 
-                "style": "primary", 
-                "color": btn_color, 
-                "margin": "xs", 
-                "height": "sm",
+                "type": "button", "style": "primary", "color": btn_color, "margin": "xs", "height": "sm",
                 "action": {"type": "message", "label": btn_label, "text": f"傳送 {name}"}
             })
             
@@ -72,11 +59,9 @@ def get_maps_carousel(p):
     return {"type": "carousel", "contents": columns}
 
 def change_map(p, target_map):
-    """處理時空傳送邏輯，精準切碎口令"""
-    # ⚡ 優化：多個替換字串的操作鏈接化，消除多餘的中間變數分配
+    """處理時空傳送邏輯"""
     target_map = target_map.replace("前往", "").replace("傳送", "").replace(" ", "").strip()
     
-    # ⚡ 優化：採用提早攔截（Early Return）機制，避免深入判斷後才拒絕，減少底層 CPU 執行堆疊
     if target_map not in MAPS_DATA:
         return f"❌ 傳送失敗！時空地圖庫中沒有【{target_map}】這張地圖。"
         
@@ -87,10 +72,32 @@ def change_map(p, target_map):
     if p.get("current_map") == target_map:
         return f"📍 你目前已經在【{target_map}】區域了，不需要重複傳送。"
         
-    if p["enemy"] is not None:
+    # ✨ 核心優化：允許玩家自由離開危險地圖，唯獨身上如果正卡著普通野外小怪才需要防呆
+    if p["enemy"] is not None and p.get("current_map") != "世界Boss":
         return "❌ 傳送失敗！你的眼前還卡著一隻野外怪物，請先打倒牠或選擇【逃跑】後才能引導傳送陣！"
 
-    # ✨ 核心地圖管線寫入
     p["current_map"] = target_map
+    
+    # 📌 核心更新：如果玩家傳送的地點是世界Boss地圖，進去一落地的瞬間，主控台自動幫他生成魔神怪物實體
+    if target_map == "世界Boss":
+        import challenge_system
+        boss_hp = challenge_system.check_boss_rebirth_and_get_hp()
+        p["enemy"] = {
+            "name": challenge_system.WORLD_BOSS_NAME,
+            "hp": boss_hp,
+            "max_hp": challenge_system.WORLD_BOSS_TOTAL_HP,
+            "atk": 160,
+            "gold_range": (1000, 5000),
+            "exp": 5000,
+            "skill": "👁️ 邪神神格：環境常駐【魔能潮汐】！",
+            "drop_item": "舊神支配者之眼",
+            "env": "🔮 魔能潮汐 (全屏大混戰，法術增幅異常狂暴)",
+            "is_world_boss": True
+        }
+    else:
+        # 如果飛去別的地方，自動卸載世界 Boss 狀態
+        if p["enemy"] and p["enemy"].get("is_world_boss"):
+            p["enemy"] = None
+            
     db_core.save_player(p)
     return f"✨ 🔮 傳送成功！時空法陣光芒收束，你已順利跨越時空抵達 ── 📍【{target_map}】！\n\n{info['desc']}"
