@@ -92,7 +92,7 @@ def make_battle_card(title, p, enemy):
     elif p.get("current_map") == "主城":
         header_title = f"🏙️ 皇家安全區：{p.get('current_city', '新手村')}"
     else:
-        header_title = f"🌲 野外危險區：{p.get('current_map', '未知領域')}"
+        header_title = f"🌲 副本/野外危險區：{p.get('current_map', '未知領域')}"
         
     contents.append({"type": "text", "text": header_title, "weight": "bold", "size": "md", "align": "center", "color": "#FFFFFF"})
     contents.append({"type": "separator", "margin": "md"})
@@ -115,7 +115,6 @@ def make_battle_card(title, p, enemy):
         
     contents.extend([
         {"type": "separator", "margin": "md"}, 
-        # 📌 核心更新：將原本顯示 user_id 或冷冰冰頭銜的地方，改為極具尊榮感的【 玩家姓名 (職業) 】
         {"type": "text", "text": f"👤 勇者：【 {p_name} 】 ({current_job} Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
         {"type": "text", "text": f"血量: {p_hp}/{calculated_max_hp}  |  魔力: {current_mp}/{calculated_max_mp}", "size": "xs", "color": "#8E8E93", "margin": "xs"},
         get_bar(p_pct, "#4CD964"), get_bar(mp_pct, "#34AADC")
@@ -126,13 +125,17 @@ def make_battle_card(title, p, enemy):
     quick_items = []
     if p_hp <= 0:
         quick_items.append(QuickReplyItem(action=MessageAction(label="😇 祈求復活", text="復活")))
-    elif enemy and not enemy.get("is_world_boss", False):
+        
+    # 📌 ⭕ 終極修復解鎖點：移除原本的 and not enemy.get("is_world_boss", False)
+    # 只要目前正卡著任何實體怪物（不論小怪、副本王、還是世界Boss），一律暢通無阻秀出戰鬥技能！
+    elif enemy:
         quick_items.append(QuickReplyItem(action=MessageAction(label="⚔️ 普通攻擊", text="攻擊")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🛡️ 技能防禦", text="使用技能防禦")))
         for s_name, s_info in job_mod.get("skills", {}).items():
             if s_info.get("type") == "active" and s_name != "普通攻擊":
                 quick_items.append(QuickReplyItem(action=MessageAction(label=f"🔮 {s_name}", text=f"使用技能 {s_name}")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🏃 轉身逃跑", text="逃跑")))
+        
     elif p.get("current_map") == "主城":
         quick_items.extend([
             QuickReplyItem(action=MessageAction(label="📆 每日簽到", text="簽到")),
