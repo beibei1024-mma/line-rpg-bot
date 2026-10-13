@@ -185,10 +185,9 @@ def process_game_logic(event, line_bot_api, configuration):
         elif user_msg in ("冒險挑戰", "挑戰"):
             card_data = challenge_system.get_challenge_menu(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "挑戰場", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-            with ApiClient(configuration) as api_client: 
+            with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-            return
-            
+        return
         elif user_msg == "挑戰爬塔":
             res = challenge_system.execute_tower_climb(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "試煉戰況", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
