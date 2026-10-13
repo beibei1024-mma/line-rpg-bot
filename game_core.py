@@ -196,14 +196,15 @@ def process_game_logic(event, line_bot_api, configuration):
             res = challenge_system.execute_world_boss_raid(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
             with ApiClient(configuration) as api_client: 
+                # ⭕ 正確修復：將 API 發送代碼內縮 4 個空格，包在 with 的肚子裡
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
             
         elif user_msg in ("鍛造工坊", "鍛造", "工坊"):
             card_data = forge_system.get_forge_menu(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-            # ✨ 🛠️ 縮排完全體修正：將原本卡死掉出 if 外側的連線精準包回分支內
             with ApiClient(configuration) as api_client: 
+                # ⭕ 正確修復：將 API 發送代碼內縮 4 個空格，包在 with 的肚子裡
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
             
@@ -213,8 +214,8 @@ def process_game_logic(event, line_bot_api, configuration):
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
             else:
                 msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "工坊熔煉結果", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
-                # ✨ 🛠️ 縮排完全體修正：將原本卡死掉出 if 外側的連線精準包回分支內
                 with ApiClient(configuration) as api_client: 
+                    # ⭕ 正確修復：將 API 發送代碼內縮 4 個空格，包在 with 的肚子裡
                     MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
             
