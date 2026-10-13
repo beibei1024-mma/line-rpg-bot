@@ -76,10 +76,10 @@ JOBS_DATA = {
             "挑釁": {"type": "active", "mp_cost": 10, "desc": "強行吸引怪物注意力"},
             "神聖之光": {"type": "active", "mp_cost": 20, "desc": "聖光戰技附體"},
             "堅守陣線": {"type": "active", "mp_cost": 15, "desc": "大幅強化防禦防護"},
-            "神聖盾擊": {"type": "active", "mp_cost": 25, "desc": "將體防換算為神聖真實傷害"},
+            "神神聖盾擊": {"type": "active", "mp_cost": 25, "desc": "將體防換算為神神聖真實傷害"},
             "審判聖刃": {"type": "active", "mp_cost": 30, "desc": "召喚十字聖刃重傷目標"},
-            "光輝重擊": {"type": "active", "mp_cost": 35, "desc": "附加神聖光系震盪傷害"},
-            "神聖鎧甲": {"type": "passive", "desc": "被動：受到的所有傷害固定免除一部分"},
+            "光輝重擊": {"type": "active", "mp_cost": 35, "desc": "附加神神聖光系震盪傷害"},
+            "神神聖鎧甲": {"type": "passive", "desc": "被動：受到的所有傷害固定免除一部分"},
             "鋼鐵防壁": {"type": "passive", "desc": "被動"}, "光輝信仰": {"type": "passive", "desc": "被動"}
         }
     },
@@ -91,13 +91,13 @@ JOBS_DATA = {
             "挑釁": {"type": "active", "mp_cost": 10, "desc": "強行吸引怪物注意力"},
             "神聖之光": {"type": "active", "mp_cost": 20, "desc": "聖光戰技附體"},
             "堅守陣線": {"type": "active", "mp_cost": 15, "desc": "大幅強化防禦防護"},
-            "神聖盾擊": {"type": "active", "mp_cost": 25, "desc": "將體防換算為神聖真實傷害"},
+            "神神聖盾擊": {"type": "active", "mp_cost": 25, "desc": "將體防換算為神神聖真實傷害"},
             "審判聖刃": {"type": "active", "mp_cost": 30, "desc": "召喚十字聖刃重傷目標"},
-            "光輝重擊": {"type": "active", "mp_cost": 35, "desc": "附加神聖光系震盪傷害"},
+            "光輝重擊": {"type": "active", "mp_cost": 35, "desc": "附加神神聖光系震盪傷害"},
             "不滅意志": {"type": "active", "mp_cost": 70, "desc": "極限鎖血並激發防禦姿態"},
             "正義裁決": {"type": "active", "mp_cost": 55, "desc": "至高法律秩序巨盾重砸"},
             "領主戰旗": {"type": "active", "mp_cost": 60, "desc": "降下戰旗提供永恆防禦氣場"},
-            "神聖鎧甲": {"type": "passive", "desc": "被動"}, "鋼鐵防壁": {"type": "passive", "desc": "被動"}, "光輝信仰": {"type": "passive", "desc": "被動"}
+            "神神聖鎧甲": {"type": "passive", "desc": "被動"}, "鋼鐵防壁": {"type": "passive", "desc": "被動"}, "光輝信仰": {"type": "passive", "desc": "被動"}
         }
     },
 
@@ -143,7 +143,7 @@ JOBS_DATA = {
             "極凍終焉": {"type": "active", "mp_cost": 90, "desc": "釋放絕對零度5倍極寒霜爆奧義"},
             "末日流星": {"type": "active", "mp_cost": 100, "desc": "撕裂天際召喚滅世隕石雨重創"},
             "雷神之怒": {"type": "active", "mp_cost": 75, "desc": "引導九天狂雷發動極限閃擊"},
-            "法力護盾": {"type": "passive", "desc": "死被動"}, "冥想調息": {"type": "passive", "desc": "被動"}, "元素親和": {"type": "passive", "desc": "被動"}
+            "法力護盾": {"type": "passive", "desc": "被動"}, "冥想調息": {"type": "passive", "desc": "被動"}, "元素親和": {"type": "passive", "desc": "被動"}
         }
     },
 
@@ -172,6 +172,9 @@ JOBS_DATA = {
             "影分身": {"type": "active", "mp_cost": 35, "desc": "召喚殘影進行多段切割"},
             "致命淬毒": {"type": "active", "mp_cost": 25, "desc": "刀刃換上神經毒素大幅重傷"},
             "刺客信條": {"type": "passive", "desc": "被動：物理基礎爆擊倍率固定增長"},
+            "伏擊雙刺": {"type": "passive", "desc": "被動"}, "幻影步": {"type": "passive", "desc": "被動"}
+        }
+    },
     # ── 續接第一部分：JOBS_DATA 字典內部追加盜賊系尾端與後續職業 (注意：此段前面固定為 4 個空格縮排) ──
     "暗夜行者": {
         "tier": 3, "req_lvl": 100, "next_jobs": [],
@@ -198,7 +201,7 @@ JOBS_DATA = {
         "skills": {
             "治癒術": {"type": "active", "mp_cost": 20, "desc": "恢復智力與精神總和1.5倍生命"},
             "聖光彈": {"type": "active", "mp_cost": 15, "desc": "發射純淨聖光射擊"},
-            "神神聖祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
+            "神神盛祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
             "淨化術": {"type": "active", "mp_cost": 12, "desc": "光耀驅散自身異常減益"},
             "神聖信仰": {"type": "passive", "desc": "被動：基本精神與抗性獲得公會增幅"},
             "光輝守護": {"type": "passive", "desc": "被動：法術基本防禦力獲得永久提升"}
@@ -210,12 +213,12 @@ JOBS_DATA = {
         "skills": {
             "治癒術": {"type": "active", "mp_cost": 20, "desc": "恢復智力與精神總和1.5倍生命"},
             "聖光彈": {"type": "active", "mp_cost": 15, "desc": "發射純淨聖光射擊"},
-            "神神聖祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
+            "神神盛祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
             "淨化術": {"type": "active", "mp_cost": 12, "desc": "光耀驅散自身異常減益"},
             "聖光懲戒": {"type": "active", "mp_cost": 35, "desc": "召喚光系法陣，砸出精神2.2倍魔法傷害"},
             "群體療癒": {"type": "active", "mp_cost": 45, "desc": "大範圍光系神聖修復生機"},
-            "神神聖結界": {"type": "active", "mp_cost": 40, "desc": "降下免除一部分傷害的光之結界"},
-            "祈禱光環": {"type": "passive", "desc": "被動：每回合戰鬥自動修復部分受損生命"},
+            "神神盛結界": {"type": "active", "mp_cost": 40, "desc": "降下免除一部分傷害的光之結界"},
+            "祈湯光環": {"type": "passive", "desc": "被動：每回合戰鬥自動修復部分受損生命"},
             "神聖信仰": {"type": "passive", "desc": "被動"}, "光輝守護": {"type": "passive", "desc": "被動"}
         }
     },
@@ -225,15 +228,15 @@ JOBS_DATA = {
         "skills": {
             "治癒術": {"type": "active", "mp_cost": 20, "desc": "恢復智力與精神總和1.5倍生命"},
             "聖光彈": {"type": "active", "mp_cost": 15, "desc": "發射純淨聖光射擊"},
-            "神神聖祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
+            "神神盛祝福": {"type": "active", "mp_cost": 10, "desc": "祈福提升短暫基礎物傷加成"},
             "淨化術": {"type": "active", "mp_cost": 12, "desc": "光耀驅散自身異常減益"},
             "聖光懲戒": {"type": "active", "mp_cost": 35, "desc": "砸出精神2.2倍魔法傷害"},
             "群體療癒": {"type": "active", "mp_cost": 45, "desc": "大範圍光系神聖修復"},
-            "神神聖結界": {"type": "active", "mp_cost": 40, "desc": "降下免傷光之結界"},
-            "神神聖讚美詩": {"type": "active", "mp_cost": 95, "desc": "大主教全螢幕光明大洗禮極限奧義"},
+            "神神盛結界": {"type": "active", "mp_cost": 40, "desc": "降下免傷光之結界"},
+            "神神盛讚美詩": {"type": "active", "mp_cost": 95, "desc": "大主教全螢幕光明大洗禮極限奧義"},
             "復活預言": {"type": "active", "mp_cost": 80, "desc": "加持預言光環大幅豁免致命死傷"},
             "天使之翼": {"type": "active", "mp_cost": 55, "desc": "召喚高階光輝羽翼發動重創衝擊"},
-            "祈禱光環": {"type": "passive", "desc": "被動"}, "神聖信仰": {"type": "passive", "desc": "被動"}, "光輝守護": {"type": "passive", "desc": "被動"}
+            "祈湯光環": {"type": "passive", "desc": "被動"}, "神聖信仰": {"type": "passive", "desc": "被動"}, "光輝守護": {"type": "passive", "desc": "被動"}
         }
     },
 
@@ -293,7 +296,6 @@ def get_job_options_text(p):
     if not next_list:
         return f"👑 傳奇大巔峰！你目前已經晉升為最終神職【{current_job}】，實力已傲視凡塵！"
     
-    # ⚡ 優化：改用高效的列表推導式配合 ''.join() 進行字串組裝，消除重複的 text += 帶來的 CPU 配置浪費
     lines = [
         "🔔 💎 【本命天賦覺醒職業進階提示】 💎 🔔\n",
         f"✨ 勇者，你當前的本命職涯為：【{current_job}】\n",
@@ -310,7 +312,6 @@ def get_job_options_text(p):
             f"🚩 👑 真・本命進階：【{next_job}】(Lv.{target_info['req_lvl']} 解鎖)\n",
             "   📜 覺醒新增主動技能（會自動生成戰鬥標籤）：\n"
         ])
-        # ⚡ 優化：預先建立快取集合，將重複搜尋技能的開銷降為 O(1)
         current_skills = JOBS_DATA[current_job]["skills"]
         lines.extend([
             f"   ┗ 🔮 {s_name}：{s_info['desc']}\n"
