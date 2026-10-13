@@ -12,10 +12,9 @@ import notice_system
 import forge_system
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【純粹戰鬥計算機 v2.6 防爆升級版】"""
+    """【純粹戰鬥計算機 v2.7 徹底解耦防爆版】"""
     
-    # 核心安全隔離：將 player 的引用函數改為此處動態載入，徹底消滅 ImportError 循環匯入
-    from player import get_player_battle_stats, save_player_battle_stats
+    # ⭕ 終極修復：彻底刪除原先引發循環匯入閃退的 from player import ... 敘述！
     
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
@@ -167,7 +166,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             elif skill_name == "影分身": total_p_dmg = int((12 + agi_val + w_bonus) * 3.4) + 350
             elif skill_name == "弒神終結": total_p_dmg = int((12 + agi_val + luk_val + w_bonus) * 5.6) + 900
             elif skill_name == "瞬獄殺": total_p_dmg = int((12 + agi_val + w_bonus) * 6.3) + 1200
-            elif skill_name == "二連矢": total_p_dmg = int((12 + agi_val + w_bonus) * 1.7) + 40
+            elif user_msg == "使用技能二連矢": total_p_dmg = int((12 + agi_val + w_bonus) * 1.7) + 40
             elif skill_name == "狙擊一擊": total_p_dmg = int((12 + agi_val + w_bonus) * 2.5) + 200
             elif skill_name == "爆影狂襲": total_p_dmg = int((12 + agi_val + w_bonus) * 3.3) + 400
             elif skill_name == "暴風萬箭破": total_p_dmg = int((12 + agi_val + luk_val + w_bonus) * 5.4) + 1100
@@ -178,7 +177,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 log += f"💖 聖光治癒！神聖恢復了生命值 +{p['hp'] - old_h} 點！\n"
                 total_p_dmg = int(int_val * 0.8)
             elif skill_name == "聖光懲戒": total_p_dmg = int((10 + int_val + men_val) * 2.4) + 150
-            elif skill_name == "神聖讚美詩": total_p_dmg = int((10 + int_val + men_val) * 5.5) + 1000
+            elif skill_name == "神神聖讚美詩": total_p_dmg = int((10 + int_val + men_val) * 5.5) + 1000
             else: total_p_dmg = int((str_val + int_val + agi_val) * 1.5)
                 
             log += f"💥 重創命中！技能對【{enemy['name']}】造成了 {total_p_dmg} 點實體法術傷害！\n"
@@ -212,7 +211,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             gold_mod = p.get("map_gold_mod", 1.0)
             gold_data = enemy["gold_range"]
             
-            # ⚡ 核心防爆修復：對 gold_range 進行嚴格的型態防錯解包，徹底封印 TypeError
             if isinstance(gold_data, (tuple, list)) and len(gold_data) >= 2:
                 min_gold, max_gold = int(gold_data[0]), int(gold_data[1])
             else:
@@ -227,7 +225,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             
             if random.random() < 0.05:
                 current_loc = p.get("current_map", "新手村")
-                # ⚡ 核心防爆修復：將條件過濾改為萬用防呆映射，確保新手鐵短劍能安全掉落入庫
                 matched_weapons = [w_name for w_name in weapons.SHOP_WEAPONS.keys() if (current_loc[:2] in w_name) or (current_loc == "新手村" and "新手" in w_name)]
                 if matched_weapons:
                     drop_w = random.choice(matched_weapons)
@@ -246,6 +243,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 
             is_job_locked = jobs_system.check_level_lock(p, job_mod)
             p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
+            
+            # ⭕ 終極修復：移除原先的 player.save_player_battle_stats()，直接改用最穩健的一體化防爆儲存管線
             db_core.save_player(p)
             
             card_data = db_core.make_battle_card(log, p, None)
