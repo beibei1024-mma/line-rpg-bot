@@ -15,7 +15,6 @@ def get_challenge_menu(p):
         
     boss_dmg = p.get('world_boss_damage', 0)
     
-    # 🌟 透過即時 SQL 計算全服總傷害，動態在選單展示 Boss 目前血量狀態
     conn = db_core.get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT SUM(COALESCE(world_boss_damage, 0)) FROM players")
@@ -127,7 +126,6 @@ def check_boss_rebirth_and_get_hp():
     server_total_damage = res[0] if res and res[0] is not None else 0
     
     if server_total_damage >= WORLD_BOSS_TOTAL_HP:
-        # 全服戰功功勳洗牌重設，魔神重新甦醒
         cur.execute("UPDATE players SET world_boss_damage = 0")
         conn.commit()
         server_total_damage = 0
@@ -137,35 +135,32 @@ def check_boss_rebirth_and_get_hp():
     return max(0, WORLD_BOSS_TOTAL_HP - server_total_damage)
 
 def execute_world_boss_raid(p):
-    """🌋 副本進入陣：將全服 Boss 實體怪物化，100% 解鎖全職業主動、被動技能加點與環境博弈要素"""
+    """🌋 副本進入陣：正式將 current_map 移動至世界Boss，強制解鎖小圖標與戰鬥核心"""
     if p["hp"] <= 0:
         card = db_core.make_battle_card("❌ 你已陣亡，無法向世界魔神發起衝鋒！", p, None)
         return {"text": "❌ 已陣亡！", "is_flex": True, "flex": card["flex"], "quick_reply": card["quick_reply"]}
         
-    # 1. 取得 Boss 目前的實體動態血量
     boss_current_hp = check_boss_rebirth_and_get_hp()
     
-    # 2. 🔥【轉換核心管線】把 Boss 包裝成一個實體 Enemy 字典！
-    # 這樣一來，當玩家點擊挑戰時，牠會直接進到 battle_core 的 while 回合制系統中
-    # 所有的「使用技能 元素暴風」、「使用技能 治癒術」和「技能防禦」將全自動完美通車！
+    # 📌 核心修正點：將玩家目前的所在地點切換成 "世界Boss"，以此跳出主城安全區按鈕的覆蓋魔咒！
+    p["current_map"] = "世界Boss"
+    
     p["enemy"] = {
         "name": WORLD_BOSS_NAME,
         "hp": boss_current_hp,
         "max_hp": WORLD_BOSS_TOTAL_HP,
-        "atk": 160,                      # 💥 魔神毀滅性基礎攻擊力
+        "atk": 160,                      
         "gold_range": (1000, 5000),
         "exp": 5000,
         "skill": "👁️ 邪神神格：承受全職業奧義轟炸！環境常駐【魔能潮汐】！",
         "drop_item": "舊神支配者之眼",
         "env": "🔮 魔能潮汐 (全屏大混戰，法術與技能增幅異常狂暴)",
-        "is_world_boss": True            # 🎯 標記身分，讓 db_core 渲染精準長血條
+        "is_world_boss": True            
     }
     
-    # 由於戰鬥核心儲存玩家會同步把這個 enemy 存入 Supabase，快取和多人在線會全自動保持一致
     db_core.save_player(p)
     
-    # 3. 封裝引導卡片，提示玩家可以開始瘋狂丟法術了
-    title_text = f"⚔️ 踏入遠古禁忌副本！你已經與全服無數勇者一同置身於討伐戰場中！\n\n📢 魔神狀態：{p['enemy']['skill']}\n🛡️ 平衡機制：各職業神聖技能已全數解鎖！請點擊下方按鈕或施放【使用技能 技能名稱】朝魔神傾瀉火力！"
+    title_text = f"⚔️ 踏入遠古禁忌副本！您已進入戰場！\n\n📢 魔神狀態：{p['enemy']['skill']}\n🛡️ 平衡機制：各職業神聖技能已全數解鎖！請點擊下方按鈕或施放【使用技能 技能名稱】朝魔神傾瀉火力！"
     card_data = db_core.make_battle_card(title_text, p, p["enemy"])
     
     return {
