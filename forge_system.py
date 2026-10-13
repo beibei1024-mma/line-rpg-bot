@@ -89,3 +89,74 @@ def execute_forge_weapon(p, cmd_str):
     db_core.save_player(p)
     
     return f"⚒️ 🔥 【 工坊熔煉天啟大成功 】 🔥 ⚒️\n───────────────────\n鐵匠揮舞重錘，熔岩鐵水四濺！你投入的素材在法陣中完美凝聚！\n\n🔨 成功打造：{new_eq['name']} ({recipe['slot']})！\n💥 武器基礎物傷：+{new_eq['atk']}\n✨ 品質天啟：成功洗鍊出 ── 【{rolled_rarity}】階級！\n📦 存放去向：神兵利器已全自動送入【我的裝備包】，請輸入【裝備包】手動穿戴上身！"
+# ── ⚙️ 核心解鎖函數 (屬於最外層頂格縮排，前面不可有任何空格，直接對接大腦) ──
+
+def get_equipment_card(p):
+    """🛡️ 生成勇者神聖裝備欄面板，直連當前穿戴武器屬性"""
+    current_weapon = p.get("weapon", "赤手空拳")
+    pure_w_name = current_weapon.split(" ] 的 ")[-1] if " ] 的 " in current_weapon else current_weapon
+    pure_w_name = pure_w_name.split("】")[-1] if "】" in pure_w_name else pure_w_name
+    pure_w_name = pure_w_name.strip()
+    
+    # 確保抓取到正確的 weapons 字典
+    w_info = weapons.SHOP_WEAPONS.get(pure_w_name, {"atk_bonus": 0, "desc": "赤手空拳，毫無攻擊力加成。"})
+    forge_bonus = int(p.get("forge_weapon_bonus", 0))
+    total_atk = w_info["atk_bonus"] + forge_bonus
+    
+    slot_contents = [
+        {"type": "text", "text": "⚔️ 主手武器 (Main-Hand Weapon)", "size": "xs", "color": "#007AFF", "weight": "bold"},
+        {"type": "text", "text": f"【 {current_weapon} 】", "size": "md", "color": "#4CD964", "weight": "bold", "marginTop": "xs"},
+        {"type": "text", "text": f"💥 實體物理傷害總增幅：+{total_atk} 點", "size": "xs", "color": "#FF9500", "margin": "xs"}
+    ]
+    
+    if forge_bonus > 0:
+        slot_contents.append({"type": "text", "text": f"   ↳ (其中內含工坊神匠覺醒：+{forge_bonus} 點)", "size": "xs", "color": "#FFCC00"})
+        
+    slot_contents.append({"type": "text", "text": f"📖 兵器神話：{w_info['desc']}", "size": "xs", "color": "#8E8E93", "margin": "xs", "wrap": True})
+    
+    contents = [
+        {"type": "text", "text": "🛡️ 勇者神聖裝備欄面板", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+        {"type": "separator", "margin": "sm", "color": "#333333"},
+        {
+            "type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
+            "contents": slot_contents
+        }
+    ]
+    
+    from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
+    quick_items = [
+        QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")),
+        QuickReplyItem(action=MessageAction(label="⚒️ 鍛造工坊", text="工坊")),
+        QuickReplyItem(action=MessageAction(label="🏃 返回世界尋怪", text="尋怪"))
+    ]
+    qr_object = QuickReply(items=quick_items)
+    
+    if current_weapon != "赤手空拳":
+        contents.append({"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "marginTop": "sm", "action": {"type": "message", "label": "❌ 卸下裝備放回背包", "text": "脫下裝備"}})
+        
+    return {"flex": {"type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}, "quick_reply": qr_object}
+
+def execute_unequip_weapon(p):
+    """卸下當前主手裝備放回備用收藏庫"""
+    current_weapon = p.get("weapon", "赤手空拳")
+    if current_weapon == "赤手空拳": 
+        return "❌ 脫除失敗！你目前本來就赤手空拳。"
+        
+    add_to_weapon_inventory(p, current_weapon)
+    p["weapon"] = "赤手空拳"
+    p["forge_weapon_bonus"] = 0 
+    db_core.save_player(p)
+    return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器 ── ⚔️【{current_weapon}】安全解下！已完整存入您的武器背包欄！"
+
+def add_to_weapon_inventory(p, w_name):
+    """⭕ 終極安全修復：補齊商店現貨購買所需的對接管線，徹底封印 AttributeError 閃退！"""
+    w_inv_str = p.get("weapon_inventory", "{}")
+    if w_inv_str in (None, "None", ""): 
+        w_inv_str = "{}"
+    try: 
+        w_dict = json.loads(w_inv_str)
+    except Exception: 
+        w_dict = {}
+        
+    w_dict[w_name] = w_dict.get(w_name, 0) + 1
+    p["weapon_inventory"] = json.dumps(w_dict, ensure_ascii=False)
