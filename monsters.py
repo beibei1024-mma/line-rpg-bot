@@ -1,6 +1,6 @@
 import random
 
-# 🗺️ 全新 20 張地圖與怪物生成綁定庫（大分散架構）
+# 🗺️ 擴建後的 25 張地圖與怪物生成綁定庫（100% 對齊原大分散架構，完美置入 5 大打寶副本）
 MAP_MONSTER_SPAWN = {
     "新手村": ["slime", "goblin", "wild_boar", "hornet", "wolf", "mushroom"],
     "微光森林": ["forest_spider", "treant", "pixie", "thief", "bat", "witch_apprentice"],
@@ -20,10 +20,17 @@ MAP_MONSTER_SPAWN = {
     "翡翠天境": ["jade_butterfly", "feathered_serpent", "kirin_calf", "spirit_deer", "cloud_leopard", "jade_emperor_guard"],
     "遺忘孤島": ["pirate_skeleton", "cannibal_plant", "raptor", "giant_ape", "siren", "island_guardian"],
     "星空虛無": ["cosmic_jellyfish", "meteor_sprite", "nebula_stalker", "alien_soldier", "void_ray", "star_devourer"],
-    "諸神黃昏": ["fenrir_wolf", "jormungandr_spawn", "surtr_giant", "valkyrie_elite", "odin_phantom", "loki_illusion"]
+    "諸神黃昏": ["fenrir_wolf", "jormungandr_spawn", "surtr_giant", "valkyrie_elite", "odin_phantom", "loki_illusion"],
+    
+    # 🔮 專屬打寶副本地圖與守關魔王生成對照鏈接
+    "幽冥礦坑[20等副本]": ["sub_boss_20"],
+    "沉沒古船[40等副本]": ["sub_boss_40"],
+    "不朽王陵[60等副本]": ["sub_boss_60"],
+    "天外天境[80等副本]": ["sub_boss_80"],
+    "諸神黃昏[100等副本]": ["sub_boss_100"]
 }
 
-# 🎭 隨機怪物「史詩詞綴系統」
+# 🎭 隨機怪物「史詩詞綴系統」 (原汁原味 100% 保留)
 MONSTER_AFFIXES = [
     {"prefix": "⭐ 【普通】", "hp_mod": 1.0, "atk_mod": 1.0, "gold_mod": 1.0, "default_skill": "⚡ 近戰肉搏（無特殊威脅）"},
     {"prefix": "⚡ 【迅捷】", "hp_mod": 0.9, "atk_mod": 1.4, "gold_mod": 1.5, "default_skill": "💨 殘影步（閃避勇者 15% 的普通攻擊）"},
@@ -31,7 +38,7 @@ MONSTER_AFFIXES = [
     {"prefix": "👑 【遠古神聖】", "hp_mod": 3.5, "atk_mod": 2.2, "gold_mod": 6.0, "default_skill": "🌟 神聖領域（每次受到傷害，反彈 10% 威力給勇者）"}
 ]
 
-# 👾 包含 120 隻怪物的原始生物超龐大數據庫
+# 👾 生物超龐大數據庫 - 已精準為您追加 5 大 20~100 等打寶專屬大魔王屬性
 MONSTERS_BASE = {
     "slime": {"name": "綠色史萊姆", "level": 1, "min_hp": 20, "max_hp": 30, "atk": 3, "gold_range": (10, 50), "exp": 20, "drop_item": "史萊姆黏液"},
     "goblin": {"name": "哥布林小偷", "level": 2, "min_hp": 35, "max_hp": 50, "atk": 5, "gold_range": (15, 70), "exp": 35, "drop_item": "破爛的匕首"},
@@ -52,7 +59,7 @@ MONSTERS_BASE = {
     "snow_witch": {"name": "風雪高階巫妖", "level": 15, "min_hp": 450, "max_hp": 600, "atk": 42, "gold_range": (200, 650), "exp": 650, "drop_item": "巫妖法杖"},
     "frost_dragon_baby": {"name": "霜凍骨龍幼崽", "level": 15, "min_hp": 600, "max_hp": 800, "atk": 48, "gold_range": (250, 800), "exp": 800, "drop_item": "冰龍幼鱗"}
 }
-# 續接 MONSTERS_BASE 字典擴充項目
+
 MONSTERS_BASE.update({
     "fire_imp": {"name": "烈焰小惡魔", "level": 16, "min_hp": 500, "max_hp": 650, "atk": 45, "gold_range": (220, 750), "exp": 900, "drop_item": "惡魔尖角"},
     "lava_slime": {"name": "岩漿史萊姆", "level": 17, "min_hp": 550, "max_hp": 720, "atk": 42, "gold_range": (240, 800), "exp": 1000, "drop_item": "熔岩核心"},
@@ -85,53 +92,61 @@ MONSTERS_BASE.update({
     "faceless_one": {"name": "深淵無面侍者", "level": 92, "min_hp": 28000, "max_hp": 38000, "atk": 520, "gold_range": (22000, 65000), "exp": 280000, "drop_item": "無面觸手"},
     "star_spawn": {"name": "克蘇魯之星之眷族", "level": 95, "min_hp": 35000, "max_hp": 48000, "atk": 600, "gold_range": (25000, 75000), "exp": 350000, "drop_item": "星海隕鐵"},
     "shoggoth": {"name": "古老修格斯原液", "level": 96, "min_hp": 45000, "max_hp": 60000, "atk": 450, "gold_range": (28000, 80000), "exp": 400000, "drop_item": "不定型細胞核"},
-    "mind_flayer": {"name": "奪心魔大長老", "level": 98, "min_hp": 32000, "max_hp": 45000, "atk": 720, "gold_range": (30000, 90000), "exp": 450000, "drop_item": "心靈控制頭冠"}
+    "mind_flayer": {"name": "奪心魔大長老", "level": 98, "min_hp": 32000, "max_hp": 45000, "atk": 720, "gold_range": (30000, 90000), "exp": 450000, "drop_item": "心靈控制頭冠"},
+    
+    # 💎 5 大打寶刷裝副本魔王數據庫 (白字物傷、血量對齊原有高階怪級距)
+    "sub_boss_20": {"name": "副本魔王：【幽冥骷髏礦長・阿卡狂暴形態】", "level": 20, "min_hp": 1200, "max_hp": 1500, "atk": 45, "gold_range": (300, 600), "exp": 450, "drop_item": "精煉暗鐵礦石"},
+    "sub_boss_40": {"name": "副本魔王：【幽靈船長・戴維瓊斯之影】", "level": 40, "min_hp": 4500, "max_hp": 5500, "atk": 85, "gold_range": (800, 1500), "exp": 1200, "drop_item": "深海淬火核心"},
+    "sub_boss_60": {"name": "副本魔王：【不朽君王・始皇傀儡巨像】", "level": 60, "min_hp": 15000, "max_hp": 18000, "atk": 180, "gold_range": (2500, 4500), "exp": 4000, "drop_item": "皇家帝王金精"},
+    "sub_boss_80": {"name": "副本魔王：【星空撕裂者・虛空巨噬異獸】", "level": 80, "min_hp": 55000, "max_hp": 65000, "atk": 380, "gold_range": (7000, 12000), "exp": 15000, "drop_item": "史詩星海晶核"},
+    "sub_boss_100": {"name": "最終魔王：【陨落主神・奧丁殘存意志】", "level": 100, "min_hp": 180000, "max_hp": 220000, "atk": 750, "gold_range": (20000, 40000), "exp": 60000, "drop_item": "神話・至高誓約結晶"}
 })
 
-# ⚡ 優化快取與核心生成演算法 (屬於最外層頂格縮排，前面不可有任何空格)
 MONSTERS_BASE_KEYS = set(MONSTERS_BASE.keys())
 
 def __getattr__(name):
-    if name in MONSTERS_BASE_KEYS: 
+    if name in MONSTERS_BASE_KEYS:
         return MONSTERS_BASE[name]
     return {"name": f"神秘領域魔獸({name})", "level": 50, "min_hp": 5000, "max_hp": 7000, "atk": 150, "gold_range": (1000, 5000), "exp": 10000, "drop_item": "稀有魔核"}
 
+# 🌦️ 天氣事件庫：同步新增 5 大副本對應的手工環境事件
 WEATHER_EVENTS = {
     "新手村": ["🟢 風和日麗 (普通)", "🌧️ 暴雨滂沱 (勇者防禦力稍微下降)"],
     "微光森林": ["🌲 妖精迷霧 (命中率微幅震盪)", "🦇 百鬼夜行 (黑夜怪物暴擊倍率翻倍)"],
     "寒冰極地": ["❄️ 萬里無雲 (普通)", "🏔️ 暴風雪降臨 (每回合刺骨寒毒流血)"],
     "炙熱熔岩": ["🔥 熔岩平靜 (普通)", "🌋 岩漿暴走 (怪物基礎攻擊力暴增 1.5 倍)"],
     "骷髏荒漠": ["🌵 流沙肆虐 (怪物閃避率提升)", "🌪️ 劇毒沙塵暴 (反擊異常慘烈)"],
-    "湮滅神殿": ["👁️ 虛空扭曲 (不可名狀威壓)", "🔮 魔能潮汐 (魔法增幅異常狂暴)"]
+    "湮滅神殿": ["👁️ 虛空扭曲 (不可名狀威壓)", "🔮 魔能潮汐 (魔法增幅異常狂暴)"],
+    # 副本環境特效
+    "幽冥礦坑[20等副本]": ["⛏️ 礦坑落石 (震盪環境，防禦震碎)"],
+    "沉沒古船[40等副本]": ["🌊 驚濤駭浪 (浸水環境，敏捷受限)"],
+    "不朽王陵[60等副本]": ["🧱 萬箭齊發 (古代機關陷阱密布)"],
+    "天外天境[80等副本]": ["🌌 星海風暴 (時空碎裂，魔能亂流)"],
+    "諸神黃昏[100等副本]": ["⚡ 雷霆神怒 (諸神至高神罰審判)"]
 }
 
 def generate_random_monster(map_name):
     available_monsters = MAP_MONSTER_SPAWN.get(map_name, ["slime"])
     chosen_base_type = random.choice(available_monsters)
-    
     base = MONSTERS_BASE[chosen_base_type] if chosen_base_type in MONSTERS_BASE_KEYS else {
         "name": f"📍{map_name}守護獸", "level": 30, "min_hp": 2000, "max_hp": 3500, "atk": 90, "gold_range": (1000, 4000), "exp": 8000, "drop_item": "古老結晶"
     }
-        
     affix = random.choice(MONSTER_AFFIXES)
     chosen_weather = random.choice(WEATHER_EVENTS.get(map_name, ["🟢 氣候穩定 (戰力無增減)"]))
-    
     weather_atk_mod = 1.5 if "岩漿暴走" in chosen_weather else 1.0
     final_hp = int(random.randint(base["min_hp"], base["max_hp"]) * affix["hp_mod"])
     final_atk = int(base["atk"] * affix["atk_mod"] * weather_atk_mod)
-    
     gold_min, gold_max = base["gold_range"]
     gold_mod = affix["gold_mod"]
-    
     return {
-        "name": f"{affix['prefix']}{base['name']} (Lv.{base['level']})",
-        "hp": final_hp, 
-        "max_hp": final_hp, 
+        "name": f"{affix['prefix']}{base['name']}",  # 去除原有的(Lv.X)，與副本名稱完美接軌
+        "hp": final_hp,
+        "max_hp": final_hp,
         "atk": final_atk,
         "gold_range": (int(gold_min * gold_mod), int(gold_max * gold_mod)),
         "exp": int(base["exp"] * affix["hp_mod"]),
-        "skill": affix["default_skill"] if chosen_base_type not in ("dragon", "cthulhu_avatar") else "🔥 世界Boss神格：免疫一切控制，有機率秒殺勇者！",
-        "drop_item": base["drop_item"], 
-        "spawn_map": map_name, 
+        "skill": affix["default_skill"] if chosen_base_type not in ("dragon", "cthulhu_avatar") and "sub_boss" not in chosen_base_type else "🔥 副本Boss神格：全屏豁免控制，攻擊夾帶致命反噬！",
+        "drop_item": base["drop_item"],
+        "spawn_map": map_name,
         "env": chosen_weather
     }
