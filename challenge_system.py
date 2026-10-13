@@ -15,6 +15,18 @@ def get_challenge_menu(p):
         
     boss_dmg = p.get('world_boss_damage', 0)
     
+    # 🌟 透過即時 SQL 計算全服總傷害，動態在選單展示 Boss 目前血量狀態
+    conn = db_core.get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT SUM(COALESCE(world_boss_damage, 0)) FROM players")
+    res = cur.fetchone()
+    server_total_damage = res[0] if res and res[0] is not None else 0
+    boss_current_hp = max(0, WORLD_BOSS_TOTAL_HP - server_total_damage)
+    cur.close()
+    conn.close()
+    
+    boss_status = "💀 已被擊殺！點擊下方按鈕將喚醒重生！" if boss_current_hp <= 0 else f"❤️ 剩餘生命：{boss_current_hp} / {WORLD_BOSS_TOTAL_HP}"
+    
     flex_menu = {
         "type": "bubble",
         "styles": {"body": {"backgroundColor": "#1A1A1A"}, "footer": {"backgroundColor": "#111111"}},
@@ -27,7 +39,8 @@ def get_challenge_menu(p):
                     {"type": "text", "text": f"🗼 無盡試煉之塔：當前第 【 {current_layer} 】 層", "size": "sm", "color": "#AF52DE", "weight": "bold"},
                     {"type": "text", "text": "   ↳ 通關可獲得翻倍金幣、珍稀圖紙與永恆榮譽。", "size": "xs", "color": "#8E8E93"},
                     {"type": "text", "text": f"🌋 世界 Boss 討伐戰：{WORLD_BOSS_NAME}", "size": "sm", "color": "#FF3B30", "weight": "bold", "marginTop": "sm"},
-                    {"type": "text", "text": f"   ↳ 全服累積傷害！個人已貢獻：⚔️ {boss_dmg} 點", "size": "xs", "color": "#8E8E93"}
+                    {"type": "text", "text": f"   ↳ {boss_status}", "size": "xs", "color": "#FF8383", "weight": "bold"},
+                    {"type": "text", "text": f"   ↳ 全服累積貢獻！個人已輸出：⚔️ {boss_dmg} 點", "size": "xs", "color": "#8E8E93"}
                 ]}
             ]
         },
@@ -35,7 +48,7 @@ def get_challenge_menu(p):
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
                 {"type": "button", "style": "primary", "color": "#AF52DE", "height": "sm", "action": {"type": "message", "label": "🗼 挑戰下一層試煉塔", "text": "挑戰爬塔"}},
-                {"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "action": {"type": "message", "label": "🌋 討伐全服世界Boss", "text": "挑戰世界Boss"}}
+                {"type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "action": {"type": "message", "label": "🌋 進入副本迎戰魔神", "text": "挑戰世界Boss"}}
             ]
         }
     }
@@ -50,8 +63,7 @@ def get_challenge_menu(p):
 def execute_tower_climb(p):
     """🗼 爬塔戰鬥計算核心"""
     layer = p.get("tower_layer", 1)
-    if layer is None: 
-        layer = 1
+    if layer is None: layer = 1
     
     monster_hp = 100 + (layer * 120)
     monster_atk = 15 + (layer * 18)
@@ -77,8 +89,7 @@ def execute_tower_climb(p):
         dmg = int(p_atk * random.uniform(0.9, 1.3))
         m_current_hp -= dmg
         log += f"💥 第 {turns} 回合：你轟出 {dmg} 點重傷！\n"
-        if m_current_hp <= 0: 
-            break
+        if m_current_hp <= 0: break
         
         m_dmg = max(1, monster_atk - p_defense_bonus)
         p_current_hp -= m_dmg
@@ -107,91 +118,59 @@ def execute_tower_climb(p):
         reply_text = f"☠️ 【試煉塔第 {layer} 層 挑戰兵敗】 ☠️\n─────────────────\n{log}\n❌ 守關者防禦太過堅固，你受傷過重狼狽撤退了..."
         return {"text": reply_text, "is_flex": True, "flex": db_core.make_battle_card(reply_text, p, None)["flex"], "quick_reply": qr_object}
 
+def check_boss_rebirth_and_get_hp():
+    """🔄 獨立大腦：檢查全服累積傷害，自動觸發滿血重生判定"""
+    conn = db_core.get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT SUM(COALESCE(world_boss_damage, 0)) FROM players")
+    res = cur.fetchone()
+    server_total_damage = res[0] if res and res[0] is not None else 0
+    
+    if server_total_damage >= WORLD_BOSS_TOTAL_HP:
+        # 全服戰功功勳洗牌重設，魔神重新甦醒
+        cur.execute("UPDATE players SET world_boss_damage = 0")
+        conn.commit()
+        server_total_damage = 0
+        
+    cur.close()
+    conn.close()
+    return max(0, WORLD_BOSS_TOTAL_HP - server_total_damage)
+
 def execute_world_boss_raid(p):
-    """世界 Boss 戰功結算：支援擊殺尾刀獎勵、自動滿血復活重生機制、全服戰功重置"""
+    """🌋 副本進入陣：將全服 Boss 實體怪物化，100% 解鎖全職業主動、被動技能加點與環境博弈要素"""
     if p["hp"] <= 0:
         card = db_core.make_battle_card("❌ 你已陣亡，無法向世界魔神發起衝鋒！", p, None)
         return {"text": "❌ 已陣亡！", "is_flex": True, "flex": card["flex"], "quick_reply": card["quick_reply"]}
         
-    current_weapon = p.get("weapon", "赤手空拳")
-    w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
-    p_atk = 20 + (p.get("strength", 10) * 2) + (p.get("intelligence", 10) * 2) + w_bonus
+    # 1. 取得 Boss 目前的實體動態血量
+    boss_current_hp = check_boss_rebirth_and_get_hp()
     
-    raid_damage = int(p_atk * random.uniform(1.5, 4.0))
-    
-    # ── 🔍 進入 Supabase 資料庫核心核算與重生管線 ──
-    conn = db_core.get_db_connection()
-    cur = conn.cursor()
-    
-    # 1. 先計算在這一刀「之前」，全服已經累積了多少傷害
-    cur.execute("SELECT SUM(COALESCE(world_boss_damage, 0)) FROM players")
-    res = cur.fetchone()
-    old_server_damage = res[0] if res and res[0] is not None else 0
-    
-    # 2. 判斷 Boss 是否在上一回合就已經死透了（防呆重設機制）
-    if old_server_damage >= WORLD_BOSS_TOTAL_HP:
-        # 🔄 【全服重生大招】清空所有人的世界 Boss 傷害，讓 Boss 滿血復活！
-        cur.execute("UPDATE players SET world_boss_damage = 0")
-        conn.commit()
-        old_server_damage = 0
-        p["world_boss_damage"] = 0  # 本地快取同步歸零
-        
-    # 3. 實體扣除血量，計算殘餘 HP
-    boss_before_hp = max(0, WORLD_BOSS_TOTAL_HP - old_server_damage)
-    
-    # 4. 寫入玩家本次造成的傷害
-    p["world_boss_damage"] = p.get("world_boss_damage", 0) + raid_damage
-    p["hp"] = max(1, p["hp"] - random.randint(20, 50))
-    db_core.save_player(p)
-    
-    # 5. 計算這一刀「之後」，Boss 的剩餘血量與是否觸發「傳奇擊殺（尾刀）」
-    boss_current_hp = max(0, boss_before_hp - raid_damage)
-    
-    kill_bonus_text = ""
-    # 🎯 檢查是否由該名勇者親手斬下最後一擊
-    if boss_before_hp > 0 and boss_current_hp <= 0:
-        p["gold"] += 50000  # 贈送 5 萬金幣尾刀獎勵！
-        import bag
-        bag.add_to_inventory(p, "舊神支配者之眼", is_material=True) # 額外掉落終極鍛造素材
-        db_core.save_player(p)
-        kill_bonus_text = f"\n\n🚨 🏆 🌟 【 🎯 傳奇通告：魔神首殺終結者 】 🌟 🏆 🚨\n恭喜你！你成功對世界 Boss 揮出了致命的【 最後一擊 】！魔神龐大的身軀轟然倒塌！\n🎁 皇家懸賞尾刀大獎發放：金幣 +50000 🪙、極品素材【舊神支配者之眼】x1 已直接送入倉庫！"
-    
-    # 6. 撈取前 5 名真名排行榜
-    cur.execute("SELECT name, job, level, COALESCE(world_boss_damage, 0) FROM players WHERE world_boss_damage > 0 ORDER BY world_boss_damage DESC LIMIT 5")
-    leaderboard_rows = cur.fetchall()
-    
-    cur.close()
-    conn.close()
-    
-    # 7. 組合排行榜文字
-    lb_lines = ["\n📊 【 🏆 皇家討伐戰功世界排行榜 🏆 】"]
-    for idx, row in enumerate(leaderboard_rows, 1):
-        real_name, job, lvl, dmg = row
-        lb_lines.append(f" 👑 第 {idx} 名：【 {real_name} 】 ({job} Lv.{lvl}) ➡️ ⚔️ {dmg} 點")
-    if len(leaderboard_rows) == 0:
-        lb_lines.append("   (目前尚無勇者登榜，快拿測試神兵砍下一刀！)")
-    leaderboard_text = "\n".join(lb_lines)
-    
-    # 如果打死魔神，戰報上方動態提示即將涅槃重生
-    status_prefix = "💀 戰況捷報：魔神已被擊殺定格！下次挑戰將涅槃重生！" if boss_current_hp <= 0 else f"💥 本回合灌入傷害：【 ⚔️ {raid_damage} 點 】！"
-    
-    reply_text = f"🌋 🔥 【世界 Boss 滅世突襲戰】 🔥 🌋\n─────────────────\n🛡️ 你發動全盛奧義，朝 {WORLD_BOSS_NAME} 揮出極限一擊！\n\n{status_prefix}\n🩹 承受魔神威壓反噬，體力扣減！{kill_bonus_text}\n{leaderboard_text}"
-    
-    boss_fake_monster = {
-        "name": WORLD_BOSS_NAME if boss_current_hp > 0 else f"☠️ 已被擊殺的 {WORLD_BOSS_NAME}",
+    # 2. 🔥【轉換核心管線】把 Boss 包裝成一個實體 Enemy 字典！
+    # 這樣一來，當玩家點擊挑戰時，牠會直接進到 battle_core 的 while 回合制系統中
+    # 所有的「使用技能 元素暴風」、「使用技能 治癒術」和「技能防禦」將全自動完美通車！
+    p["enemy"] = {
+        "name": WORLD_BOSS_NAME,
         "hp": boss_current_hp,
         "max_hp": WORLD_BOSS_TOTAL_HP,
-        "is_world_boss": True
+        "atk": 160,                      # 💥 魔神毀滅性基礎攻擊力
+        "gold_range": (1000, 5000),
+        "exp": 5000,
+        "skill": "👁️ 邪神神格：承受全職業奧義轟炸！環境常駐【魔能潮汐】！",
+        "drop_item": "舊神支配者之眼",
+        "env": "🔮 魔能潮汐 (全屏大混戰，法術與技能增幅異常狂暴)",
+        "is_world_boss": True            # 🎯 標記身分，讓 db_core 渲染精準長血條
     }
     
-    quick_items = [
-        QuickReplyItem(action=MessageAction(label="🌋 再次合力圍剿" if boss_current_hp > 0 else "🔄 喚醒重生魔神", text="挑戰世界Boss")),
-        QuickReplyItem(action=MessageAction(label="📊 查看世界戰況", text="挑戰")),
-        QuickReplyItem(action=MessageAction(label="🏃 返回普通尋怪", text="尋怪"))
-    ]
+    # 由於戰鬥核心儲存玩家會同步把這個 enemy 存入 Supabase，快取和多人在線會全自動保持一致
+    db_core.save_player(p)
+    
+    # 3. 封裝引導卡片，提示玩家可以開始瘋狂丟法術了
+    title_text = f"⚔️ 踏入遠古禁忌副本！你已經與全服無數勇者一同置身於討伐戰場中！\n\n📢 魔神狀態：{p['enemy']['skill']}\n🛡️ 平衡機制：各職業神聖技能已全數解鎖！請點擊下方按鈕或施放【使用技能 技能名稱】朝魔神傾瀉火力！"
+    card_data = db_core.make_battle_card(title_text, p, p["enemy"])
+    
     return {
-        "text": reply_text, 
-        "is_flex": True, 
-        "flex": db_core.make_battle_card(reply_text, p, boss_fake_monster)["flex"], 
-        "quick_reply": QuickReply(items=quick_items)
+        "text": "已進入世界 Boss 戰場！",
+        "is_flex": True,
+        "flex": card_data["flex"],
+        "quick_reply": card_data["quick_reply"]
     }
