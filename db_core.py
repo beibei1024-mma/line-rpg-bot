@@ -4,7 +4,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
-# ⚡ 優化：利用記憶體快取與全域連線池概念降低連線開銷
 MEMORY_PLAYERS = {}
 _db_pool_url = os.environ.get('DATABASE_URL')
 
@@ -12,7 +11,6 @@ def get_db_connection():
     return psycopg2.connect(_db_pool_url)
 
 def load_player(user_id):
-    # O(1) 記憶體優先讀取
     if user_id in MEMORY_PLAYERS:
         return MEMORY_PLAYERS[user_id]
         
@@ -22,7 +20,6 @@ def load_player(user_id):
         cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
         
-        # 当找不到玩家時，提早防錯插入並 commit，簡化邏輯流程
         if not player:
             cur.execute(
                 "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points, last_sign_in, current_map, current_city) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0, 'None', '主城', '新手村')",
@@ -61,7 +58,6 @@ def save_player(p):
         conn.close()
 
 def make_battle_card(title, p, enemy):
-    """【皇家地圖分流完全體】依位置動態切換小圖標，戰鬥中常駐解鎖技能防禦熱鍵"""
     import jobs
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
@@ -73,10 +69,8 @@ def make_battle_card(title, p, enemy):
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
     
     current_mp = p.get("mp", calculated_max_mp)
-    if current_mp is None: 
-        current_mp = calculated_max_mp
+    if current_mp is None: current_mp = calculated_max_mp
     
-    # 進度條百分比計算改用更快速的常數邊界約束
     p_hp = p["hp"]
     p_pct = 0 if p_hp <= 0 else (100 if p_hp >= calculated_max_hp else int((p_hp / calculated_max_hp) * 100))
     mp_pct = 0 if current_mp <= 0 else (100 if current_mp >= calculated_max_mp else int((current_mp / calculated_max_mp) * 100))
@@ -99,18 +93,21 @@ def make_battle_card(title, p, enemy):
     contents.append({"type": "separator", "margin": "md"})
     contents.append({"type": "text", "text": str(title), "size": "sm", "wrap": True, "margin": "md", "color": "#E0E0E0"})
     
-    # 👾 怪物狀態渲染區（已加入數值顯示優化）
+    # 👾 怪物 / 世界 Boss 狀態渲染區（數值與長血條完美合璧版）
     if enemy: 
         e_hp = enemy["hp"]
         e_max = enemy["max_hp"]
         e_pct = 0 if e_hp <= 0 else (100 if e_hp >= e_max else int((e_hp / e_max) * 100))
         
-        # ⚡ 核心優化點：比照角色面板，在怪物的血條上方安插精確的血量數值欄位
+        # 動態判定小標題色彩與血量排版
+        is_wb = enemy.get("is_world_boss", False)
+        boss_title_color = "#FF1F1F" if is_wb else "#FF3B30"
+        
         contents.extend([
             {"type": "separator", "margin": "md"}, 
-            {"type": "text", "text": f"👾 {enemy['name']}", "weight": "bold", "size": "md", "margin": "md", "color": "#FF3B30"}, 
-            {"type": "text", "text": f"血量: {e_hp}/{e_max}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, # 👈 精準加入這行
-            get_bar(e_pct, "#FF3B30")
+            {"type": "text", "text": f"{enemy['name']}", "weight": "bold", "size": "md", "margin": "md", "color": boss_title_color}, 
+            {"type": "text", "text": f"血量殘餘: {e_hp} / {e_max}", "size": "xs", "color": "#FF8383" if is_wb else "#8E8E93", "margin": "xs", "weight": "bold" if is_wb else "regular"},
+            get_bar(e_pct, "#FF1F1F" if is_wb else "#FF3B30")
         ])
         
     contents.extend([
@@ -122,19 +119,16 @@ def make_battle_card(title, p, enemy):
     
     flex_bubble = {"type": "bubble", "styles": {"body": {"backgroundColor": "#1C1C1E"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}
     
-    # 🕹️ Quick Reply 記憶體最佳化分配
     quick_items = []
-    
     if p_hp <= 0:
         quick_items.append(QuickReplyItem(action=MessageAction(label="😇 祈求復活", text="復活")))
-    elif enemy:
+    elif enemy and not enemy.get("is_world_boss", False):
         quick_items.append(QuickReplyItem(action=MessageAction(label="⚔️ 普通攻擊", text="攻擊")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🛡️ 技能防禦", text="使用技能防禦")))
         for s_name, s_info in job_mod.get("skills", {}).items():
             if s_info.get("type") == "active" and s_name != "普通攻擊":
                 quick_items.append(QuickReplyItem(action=MessageAction(label=f"🔮 {s_name}", text=f"使用技能 {s_name}")))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🏃 轉身逃跑", text="逃跑")))
-        
     elif p.get("current_map") == "主城":
         quick_items.extend([
             QuickReplyItem(action=MessageAction(label="📆 每日簽到", text="簽到")),
