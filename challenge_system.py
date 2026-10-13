@@ -13,7 +13,6 @@ def get_challenge_menu(p):
     if current_layer is None: 
         current_layer = 1
         
-    # ⚡ 優化：將舊有的 + str() 串接方式改為 Python 內建高效率的 f-string，降低記憶體配置虛耗
     boss_dmg = p.get('world_boss_damage', 0)
     
     flex_menu = {
@@ -49,7 +48,7 @@ def get_challenge_menu(p):
     return {"flex": flex_menu, "quick_reply": QuickReply(items=quick_items)}
 
 def execute_tower_climb(p):
-    """🗼 爬塔戰鬥計算核心 (回傳格式一體化 Dict，全自動帶出快捷小圖卡)"""
+    """🗼 爬塔戰鬥計算核心"""
     layer = p.get("tower_layer", 1)
     if layer is None: 
         layer = 1
@@ -71,8 +70,6 @@ def execute_tower_climb(p):
     turns = 0
     m_current_hp = monster_hp
     p_current_hp = p["hp"]
-    
-    # ⚡ 優化：將防禦力加成與計算搬移到迴圈外快取，徹底杜絕 while 迴圈在五次迭代內重複執行 p.get 雜湊查詢
     p_defense_bonus = p.get("vitality", 10) // 2
     
     while m_current_hp > 0 and p_current_hp > 0 and turns < 5:
@@ -111,30 +108,66 @@ def execute_tower_climb(p):
         return {"text": reply_text, "is_flex": True, "flex": db_core.make_battle_card(reply_text, p, None)["flex"], "quick_reply": qr_object}
 
 def execute_world_boss_raid(p):
-    """世界 Boss 戰功結算，同步附帶滑動小圖卡"""
+    """世界 Boss 戰功結算，動態統計全服總傷害生成血條，並拉取前5名戰功排行榜"""
     if p["hp"] <= 0:
         card = db_core.make_battle_card("❌ 你已陣亡，無法向世界魔神發起衝鋒！", p, None)
         return {"text": "❌ 已陣亡！", "is_flex": True, "flex": card["flex"], "quick_reply": card["quick_reply"]}
         
     current_weapon = p.get("weapon", "赤手空拳")
-    w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
-    
-    # ⚡ 優化：提取本地常數計算，優化多字典調用速度
-    p_strength = p.get("strength", 10)
-    p_intelligence = p.get("intelligence", 10)
-    p_atk = 20 + (p_strength * 2) + (p_intelligence * 2) + w_bonus
+    w_bonus = weapons.SHOP_WEAspects = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
+    p_atk = 20 + (p.get("strength", 10) * 2) + (p.get("intelligence", 10) * 2) + w_bonus
     
     raid_damage = int(p_atk * random.uniform(1.5, 4.0))
-    boss_damage_total = p.get("world_boss_damage", 0) + raid_damage
-    p["world_boss_damage"] = boss_damage_total
+    p["world_boss_damage"] = p.get("world_boss_damage", 0) + raid_damage
     p["hp"] = max(1, p["hp"] - random.randint(20, 50))
     db_core.save_player(p)
     
-    reply_text = f"🌋 🔥 【世界 Boss 滅世突襲戰】 🔥 🌋\n─────────────────\n🛡️ 你發動全盛奧義，朝 {WORLD_BOSS_NAME} 揮出極限一擊！\n\n💥 灌入巨額總傷：【 ⚔️ {raid_damage} 】 點！\n🩹 承受滅世反噬：體力扣減流血...\n📈 個人累計總戰功已達 ── 【 🏆 {boss_damage_total} 】 點！"
+    # 🌟 【排行榜與總血量核心管線】直接從 Supabase 即時加總全服所有勇者的傷害
+    conn = db_core.get_db_connection()
+    cur = conn.cursor()
+    
+    # 1. 撈取全服總傷害以動態換算 Boss 剩餘血量
+    cur.execute("SELECT SUM(COALESCE(world_boss_damage, 0)) FROM players")
+    server_total_damage = cur.fetchone()[0] or 0
+    boss_current_hp = max(0, WORLD_BOSS_TOTAL_HP - server_total_damage)
+    
+    # 2. 🔥【排行榜實裝】撈取全服貢獻排名前 5 名的玩家
+    cur.execute("SELECT user_id, job, level, COALESCE(world_boss_damage, 0) FROM players WHERE world_boss_damage > 0 ORDER BY world_boss_damage DESC LIMIT 5")
+    leaderboard_rows = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    # 3. 組合排行榜文字
+    lb_lines = ["\n📊 【 🏆 皇家討伐戰功世界排行榜 🏆 】"]
+    for idx, row in enumerate(leaderboard_rows, 1):
+        uid, job, lvl, dmg = row
+        # 隱碼保護 UID
+        short_id = f"勇者*{str(uid)[-4:]}" if len(str(uid)) >= 4 else f"勇者{idx}"
+        lb_lines.append(f" 🥇 第 {idx} 名：{short_id} ({job} Lv.{lvl}) ➡️ ⚔️ {dmg} 點")
+    if len(leaderboard_rows) == 0:
+        lb_lines.append("   (目前尚無勇者登榜，快拿測試神兵砍下一刀！)")
+        
+    leaderboard_text = "\n".join(lb_lines)
+    
+    reply_text = f"🌋 🔥 【世界 Boss 滅世突襲戰】 🔥 🌋\n─────────────────\n🛡️ 你發動全盛奧義，朝 {WORLD_BOSS_NAME} 揮出極限一擊！\n\n💥 本回合灌入傷害：【 ⚔️ {raid_damage} 點 】！\n🩹 承受魔神威壓反噬，體力扣減！\n{leaderboard_text}"
+    
+    # 封裝一個虛擬怪物包丟給 db_core，讓其強行渲染出 Boss 血條與數值
+    boss_fake_monster = {
+        "name": WORLD_BOSS_NAME,
+        "hp": boss_current_hp,
+        "max_hp": WORLD_BOSS_TOTAL_HP,
+        "is_world_boss": True
+    }
     
     quick_items = [
         QuickReplyItem(action=MessageAction(label="🌋 再次合力圍剿", text="挑戰世界Boss")),
         QuickReplyItem(action=MessageAction(label="📊 查看世界戰況", text="挑戰")),
         QuickReplyItem(action=MessageAction(label="🏃 返回普通尋怪", text="尋怪"))
     ]
-    return {"text": reply_text, "is_flex": True, "flex": db_core.make_battle_card(reply_text, p, None)["flex"], "quick_reply": QuickReply(items=quick_items)}
+    return {
+        "text": reply_text, 
+        "is_flex": True, 
+        "flex": db_core.make_battle_card(reply_text, p, boss_fake_monster)["flex"], 
+        "quick_reply": QuickReply(items=quick_items)
+    }
