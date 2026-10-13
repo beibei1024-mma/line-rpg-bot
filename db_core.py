@@ -20,9 +20,10 @@ def load_player(user_id):
         cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
         
+        # 📌 核心更新：新增玩家時預設寫入 name 欄位為 '新進勇者'
         if not player:
             cur.execute(
-                "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points, last_sign_in, current_map, current_city) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0, 'None', '主城', '新手村')",
+                "INSERT INTO players (user_id, name, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points, last_sign_in, current_map, current_city) VALUES (%s, '新進勇者', 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0, 'None', '主城', '新手村')",
                 (user_id,)
             )
             conn.commit()
@@ -47,9 +48,10 @@ def save_player(p):
     cur = conn.cursor()
     try:
         enemy_str = json.dumps(p['enemy']) if p['enemy'] else None
+        # 📌 核心更新：更新時同步將 p['name'] 儲存回 Supabase 資料庫
         cur.execute(
-            "UPDATE players SET hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s, last_sign_in=%s, current_map=%s, current_city=%s WHERE user_id=%s",
-            (p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
+            "UPDATE players SET name=%s, hp=%s, max_hp=%s, level=%s, exp=%s, gold=%s, weapon=%s, enemy=%s, strength=%s, agility=%s, intelligence=%s, vitality=%s, luck=%s, sprit=%s, job=%s, attribute_points=%s, last_sign_in=%s, current_map=%s, current_city=%s WHERE user_id=%s",
+            (p.get('name', '新進勇者'), p['hp'], p['max_hp'], p['level'], p['exp'], p['gold'], p['weapon'], enemy_str, 
              p.get('strength', 10), p.get('agility', 10), p.get('intelligence', 10), p.get('vitality', 10), p.get('luck', 10), p.get('sprit', 10), p.get('job', '初心者'), p.get('attribute_points', 0), p.get('last_sign_in', 'None'), p.get('current_map', '主城'), p.get('current_city', '新手村'), user_id)
         )
         conn.commit()
@@ -62,6 +64,9 @@ def make_battle_card(title, p, enemy):
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
+    
+    # 📌 核心更新：提取玩家真實姓名
+    p_name = p.get("name", "新進勇者")
     
     vit_val = int(p.get("vitality", 10) * job_mod["vit_mod"])
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
@@ -93,13 +98,11 @@ def make_battle_card(title, p, enemy):
     contents.append({"type": "separator", "margin": "md"})
     contents.append({"type": "text", "text": str(title), "size": "sm", "wrap": True, "margin": "md", "color": "#E0E0E0"})
     
-    # 👾 怪物 / 世界 Boss 狀態渲染區（數值與長血條完美合璧版）
     if enemy: 
         e_hp = enemy["hp"]
         e_max = enemy["max_hp"]
         e_pct = 0 if e_hp <= 0 else (100 if e_hp >= e_max else int((e_hp / e_max) * 100))
         
-        # 動態判定小標題色彩與血量排版
         is_wb = enemy.get("is_world_boss", False)
         boss_title_color = "#FF1F1F" if is_wb else "#FF3B30"
         
@@ -112,7 +115,8 @@ def make_battle_card(title, p, enemy):
         
     contents.extend([
         {"type": "separator", "margin": "md"}, 
-        {"type": "text", "text": f"👤 {current_job} (Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
+        # 📌 核心更新：將原本顯示 user_id 或冷冰冰頭銜的地方，改為極具尊榮感的【 玩家姓名 (職業) 】
+        {"type": "text", "text": f"👤 勇者：【 {p_name} 】 ({current_job} Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"}, 
         {"type": "text", "text": f"血量: {p_hp}/{calculated_max_hp}  |  魔力: {current_mp}/{calculated_max_mp}", "size": "xs", "color": "#8E8E93", "margin": "xs"},
         get_bar(p_pct, "#4CD964"), get_bar(mp_pct, "#34AADC")
     ])
