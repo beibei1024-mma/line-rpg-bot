@@ -188,40 +188,40 @@ def process_game_logic(event, line_bot_api, configuration):
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
-        elif user_msg == "挑戰爬塔":
-            res = challenge_system.execute_tower_climb(p)
-            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "試煉戰況", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
+    if user_msg == "挑戰爬塔":
+        res = challenge_system.execute_tower_climb(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "試煉戰況", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
+        
+    elif user_msg in ("挑戰世界Boss", "世界Boss"):
+        res = challenge_system.execute_world_boss_raid(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
+        
+    elif user_msg in ("鍛造工坊", "鍛造", "工坊"):
+        card_data = forge_system.get_forge_menu(p)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
+        
+    elif user_msg.startswith("鍛造"):
+        res = forge_system.execute_forge_weapon(p, user_msg)
+        if isinstance(res, str):
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
+        else:
+            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "工坊熔煉結果", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-            return
-            
-        elif user_msg in ("挑戰世界Boss", "世界Boss"):
-            res = challenge_system.execute_world_boss_raid(p)
-            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-            return
-            
-        elif user_msg in ("鍛造工坊", "鍛造", "工坊"):
-            card_data = forge_system.get_forge_menu(p)
-            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "鍛造工坊", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-            return
-            
-        elif user_msg.startswith("鍛造"):
-            res = forge_system.execute_forge_weapon(p, user_msg)
-            if isinstance(res, str):
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
-            else:
-                msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "工坊熔煉結果", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
-            return
-            
-        elif user_msg in ("尋找怪物", "尋怪", "攻擊", "使用技能"):
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
-            return
+        return
+        
+    elif user_msg in ("尋找怪物", "尋怪", "攻擊", "使用技能"):
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
+        return
 
     if user_msg.startswith("轉職"):
         jobs_system.handle_job_transfer(event, line_bot_api, p, user_msg, configuration)
