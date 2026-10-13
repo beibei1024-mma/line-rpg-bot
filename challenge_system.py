@@ -108,7 +108,7 @@ def execute_tower_climb(p):
         return {"text": reply_text, "is_flex": True, "flex": db_core.make_battle_card(reply_text, p, None)["flex"], "quick_reply": qr_object}
 
 def execute_world_boss_raid(p):
-    """世界 Boss 戰功結算，動態統計全服總傷害生成血條，並拉取前 5 名【真實姓名】排行榜"""
+    """世界 Boss 戰功結算：支援擊殺尾刀獎勵、自動滿血復活重生機制、全服戰功重置"""
     if p["hp"] <= 0:
         card = db_core.make_battle_card("❌ 你已陣亡，無法向世界魔神發起衝鋒！", p, None)
         return {"text": "❌ 已陣亡！", "is_flex": True, "flex": card["flex"], "quick_reply": card["quick_reply"]}
@@ -118,50 +118,74 @@ def execute_world_boss_raid(p):
     p_atk = 20 + (p.get("strength", 10) * 2) + (p.get("intelligence", 10) * 2) + w_bonus
     
     raid_damage = int(p_atk * random.uniform(1.5, 4.0))
+    
+    # ── 🔍 進入 Supabase 資料庫核心核算與重生管線 ──
+    conn = db_core.get_db_connection()
+    cur = conn.cursor()
+    
+    # 1. 先計算在這一刀「之前」，全服已經累積了多少傷害
+    cur.execute("SELECT SUM(COALESCE(world_boss_damage, 0)) FROM players")
+    res = cur.fetchone()
+    old_server_damage = res[0] if res and res[0] is not None else 0
+    
+    # 2. 判斷 Boss 是否在上一回合就已經死透了（防呆重設機制）
+    if old_server_damage >= WORLD_BOSS_TOTAL_HP:
+        # 🔄 【全服重生大招】清空所有人的世界 Boss 傷害，讓 Boss 滿血復活！
+        cur.execute("UPDATE players SET world_boss_damage = 0")
+        conn.commit()
+        old_server_damage = 0
+        p["world_boss_damage"] = 0  # 本地快取同步歸零
+        
+    # 3. 實體扣除血量，計算殘餘 HP
+    boss_before_hp = max(0, WORLD_BOSS_TOTAL_HP - old_server_damage)
+    
+    # 4. 寫入玩家本次造成的傷害
     p["world_boss_damage"] = p.get("world_boss_damage", 0) + raid_damage
     p["hp"] = max(1, p["hp"] - random.randint(20, 50))
     db_core.save_player(p)
     
-    # 直接從 Supabase 即時加總全服所有勇者的傷害與真實名字
-    conn = db_core.get_db_connection()
-    cur = conn.cursor()
+    # 5. 計算這一刀「之後」，Boss 的剩餘血量與是否觸發「傳奇擊殺（尾刀）」
+    boss_current_hp = max(0, boss_before_hp - raid_damage)
     
-    # 1. 撈取全服總傷害以動態換算 Boss 剩餘血量
-    cur.execute("SELECT SUM(COALESCE(world_boss_damage, 0)) FROM players")
-    res = cur.fetchone()
-    server_total_damage = res[0] if res and res[0] is not None else 0
-    boss_current_hp = max(0, WORLD_BOSS_TOTAL_HP - server_total_damage)
+    kill_bonus_text = ""
+    # 🎯 檢查是否由該名勇者親手斬下最後一擊
+    if boss_before_hp > 0 and boss_current_hp <= 0:
+        p["gold"] += 50000  # 贈送 5 萬金幣尾刀獎勵！
+        import bag
+        bag.add_to_inventory(p, "舊神支配者之眼", is_material=True) # 額外掉落終極鍛造素材
+        db_core.save_player(p)
+        kill_bonus_text = f"\n\n🚨 🏆 🌟 【 🎯 傳奇通告：魔神首殺終結者 】 🌟 🏆 🚨\n恭喜你！你成功對世界 Boss 揮出了致命的【 最後一擊 】！魔神龐大的身軀轟然倒塌！\n🎁 皇家懸賞尾刀大獎發放：金幣 +50000 🪙、極品素材【舊神支配者之眼】x1 已直接送入倉庫！"
     
-    # 2. 🔥【傳奇真名排行榜實裝】改為撈取 name 欄位，徹底抹除冷冰冰的 user_id
+    # 6. 撈取前 5 名真名排行榜
     cur.execute("SELECT name, job, level, COALESCE(world_boss_damage, 0) FROM players WHERE world_boss_damage > 0 ORDER BY world_boss_damage DESC LIMIT 5")
     leaderboard_rows = cur.fetchall()
     
     cur.close()
     conn.close()
     
-    # 3. 組合排行榜文字
+    # 7. 組合排行榜文字
     lb_lines = ["\n📊 【 🏆 皇家討伐戰功世界排行榜 🏆 】"]
     for idx, row in enumerate(leaderboard_rows, 1):
         real_name, job, lvl, dmg = row
-        # 顯示勇者設定的真名！
         lb_lines.append(f" 👑 第 {idx} 名：【 {real_name} 】 ({job} Lv.{lvl}) ➡️ ⚔️ {dmg} 點")
     if len(leaderboard_rows) == 0:
         lb_lines.append("   (目前尚無勇者登榜，快拿測試神兵砍下一刀！)")
-        
     leaderboard_text = "\n".join(lb_lines)
     
-    reply_text = f"🌋 🔥 【世界 Boss 滅世突襲戰】 🔥 🌋\n─────────────────\n🛡️ 你發動全盛奧義，朝 {WORLD_BOSS_NAME} 揮出極限一擊！\n\n💥 本回合灌入傷害：【 ⚔️ {raid_damage} 點 】！\n🩹 承受魔神威壓反噬，體力扣減！\n{leaderboard_text}"
+    # 如果打死魔神，戰報上方動態提示即將涅槃重生
+    status_prefix = "💀 戰況捷報：魔神已被擊殺定格！下次挑戰將涅槃重生！" if boss_current_hp <= 0 else f"💥 本回合灌入傷害：【 ⚔️ {raid_damage} 點 】！"
     
-    # 封裝虛擬魔王封包丟給 db_core 強行渲染長血條與實體數值
+    reply_text = f"🌋 🔥 【世界 Boss 滅世突襲戰】 🔥 🌋\n─────────────────\n🛡️ 你發動全盛奧義，朝 {WORLD_BOSS_NAME} 揮出極限一擊！\n\n{status_prefix}\n🩹 承受魔神威壓反噬，體力扣減！{kill_bonus_text}\n{leaderboard_text}"
+    
     boss_fake_monster = {
-        "name": WORLD_BOSS_NAME,
+        "name": WORLD_BOSS_NAME if boss_current_hp > 0 else f"☠️ 已被擊殺的 {WORLD_BOSS_NAME}",
         "hp": boss_current_hp,
         "max_hp": WORLD_BOSS_TOTAL_HP,
         "is_world_boss": True
     }
     
     quick_items = [
-        QuickReplyItem(action=MessageAction(label="🌋 再次合力圍剿", text="挑戰世界Boss")),
+        QuickReplyItem(action=MessageAction(label="🌋 再次合力圍剿" if boss_current_hp > 0 else "🔄 喚醒重生魔神", text="挑戰世界Boss")),
         QuickReplyItem(action=MessageAction(label="📊 查看世界戰況", text="挑戰")),
         QuickReplyItem(action=MessageAction(label="🏃 返回普通尋怪", text="尋怪"))
     ]
