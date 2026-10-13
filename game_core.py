@@ -187,15 +187,12 @@ def process_game_logic(event, line_bot_api, configuration):
             with ApiClient(configuration) as api_client: 
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
-        elif user_msg in ("挑戰世界Boss", "世界Boss"):
-            res = challenge_system.execute_world_boss_raid(p)
-            msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
-            with ApiClient(configuration) as api_client: 
         # ── 續接第一部分：處於主城安全區內的指令導流 (接續 if current_loc == "主城" 的縮排) ──
         elif user_msg in ("挑戰世界Boss", "世界Boss"):
             res = challenge_system.execute_world_boss_raid(p)
             msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "Boss戰報", "contents": res["flex"], "quickReply": res["quick_reply"]}]}
             with ApiClient(configuration) as api_client: 
+                # ── ⭕ 精準接續第一部分最尾端漏掉的 with 肚子動作 (維持 16 格縮排) ──
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
             return
             
@@ -220,7 +217,7 @@ def process_game_logic(event, line_bot_api, configuration):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！"))
             return
             
-    # 🌲 3. 處於野外危險區的指令導流 (退回四格，與 if current_loc == "主城" 的層級完全對齊)
+    # 🌲 3. 處於野外危險區的指令導流 (退回 4 格，與主控台頂層 if 對齊)
     if user_msg.startswith("轉職"):
         jobs_system.handle_job_transfer(event, line_bot_api, p, user_msg, configuration)
         return
