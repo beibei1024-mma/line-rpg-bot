@@ -50,7 +50,10 @@ MONSTERS_BASE = {
     "yeti": {"name": "遠古雪人", "level": 13, "min_hp": 400, "max_hp": 550, "atk": 32, "gold_range": (150, 500), "exp": 460, "drop_item": "雪人毛皮"},
     "ice_golem": {"name": "萬年冰晶傀儡", "level": 14, "min_hp": 500, "max_hp": 680, "atk": 30, "gold_range": (180, 580), "exp": 550, "drop_item": "寒冰精粹"},
     "snow_witch": {"name": "風雪高階巫妖", "level": 15, "min_hp": 450, "max_hp": 600, "atk": 42, "gold_range": (200, 650), "exp": 650, "drop_item": "巫妖法杖"},
-    "frost_dragon_baby": {"name": "霜凍骨龍幼崽", "level": 15, "min_hp": 600, "max_hp": 800, "atk": 48, "gold_range": (250, 800), "exp": 800, "drop_item": "冰龍幼鱗"},
+    "frost_dragon_baby": {"name": "霜凍骨龍幼崽", "level": 15, "min_hp": 600, "max_hp": 800, "atk": 48, "gold_range": (250, 800), "exp": 800, "drop_item": "冰龍幼鱗"}
+}
+# 續接 MONSTERS_BASE 字典擴充項目
+MONSTERS_BASE.update({
     "fire_imp": {"name": "烈焰小惡魔", "level": 16, "min_hp": 500, "max_hp": 650, "atk": 45, "gold_range": (220, 750), "exp": 900, "drop_item": "惡魔尖角"},
     "lava_slime": {"name": "岩漿史萊姆", "level": 17, "min_hp": 550, "max_hp": 720, "atk": 42, "gold_range": (240, 800), "exp": 1000, "drop_item": "熔岩核心"},
     "magma_crab": {"name": "黑曜石熔岩蟹", "level": 18, "min_hp": 700, "max_hp": 950, "atk": 40, "gold_range": (260, 900), "exp": 1150, "drop_item": "黑曜石外殼"},
@@ -83,4 +86,52 @@ MONSTERS_BASE = {
     "star_spawn": {"name": "克蘇魯之星之眷族", "level": 95, "min_hp": 35000, "max_hp": 48000, "atk": 600, "gold_range": (25000, 75000), "exp": 350000, "drop_item": "星海隕鐵"},
     "shoggoth": {"name": "古老修格斯原液", "level": 96, "min_hp": 45000, "max_hp": 60000, "atk": 450, "gold_range": (28000, 80000), "exp": 400000, "drop_item": "不定型細胞核"},
     "mind_flayer": {"name": "奪心魔大長老", "level": 98, "min_hp": 32000, "max_hp": 45000, "atk": 720, "gold_range": (30000, 90000), "exp": 450000, "drop_item": "心靈控制頭冠"}
+})
+
+# ⚡ 優化快取與核心生成演算法 (屬於最外層頂格縮排，前面不可有任何空格)
+MONSTERS_BASE_KEYS = set(MONSTERS_BASE.keys())
+
+def __getattr__(name):
+    if name in MONSTERS_BASE_KEYS: 
+        return MONSTERS_BASE[name]
+    return {"name": f"神秘領域魔獸({name})", "level": 50, "min_hp": 5000, "max_hp": 7000, "atk": 150, "gold_range": (1000, 5000), "exp": 10000, "drop_item": "稀有魔核"}
+
+WEATHER_EVENTS = {
+    "新手村": ["🟢 風和日麗 (普通)", "🌧️ 暴雨滂沱 (勇者防禦力稍微下降)"],
+    "微光森林": ["🌲 妖精迷霧 (命中率微幅震盪)", "🦇 百鬼夜行 (黑夜怪物暴擊倍率翻倍)"],
+    "寒冰極地": ["❄️ 萬里無雲 (普通)", "🏔️ 暴風雪降臨 (每回合刺骨寒毒流血)"],
+    "炙熱熔岩": ["🔥 熔岩平靜 (普通)", "🌋 岩漿暴走 (怪物基礎攻擊力暴增 1.5 倍)"],
+    "骷髏荒漠": ["🌵 流沙肆虐 (怪物閃避率提升)", "🌪️ 劇毒沙塵暴 (反擊異常慘烈)"],
+    "湮滅神殿": ["👁️ 虛空扭曲 (不可名狀威壓)", "🔮 魔能潮汐 (魔法增幅異常狂暴)"]
 }
+
+def generate_random_monster(map_name):
+    available_monsters = MAP_MONSTER_SPAWN.get(map_name, ["slime"])
+    chosen_base_type = random.choice(available_monsters)
+    
+    base = MONSTERS_BASE[chosen_base_type] if chosen_base_type in MONSTERS_BASE_KEYS else {
+        "name": f"📍{map_name}守護獸", "level": 30, "min_hp": 2000, "max_hp": 3500, "atk": 90, "gold_range": (1000, 4000), "exp": 8000, "drop_item": "古老結晶"
+    }
+        
+    affix = random.choice(MONSTER_AFFIXES)
+    chosen_weather = random.choice(WEATHER_EVENTS.get(map_name, ["🟢 氣候穩定 (戰力無增減)"]))
+    
+    weather_atk_mod = 1.5 if "岩漿暴走" in chosen_weather else 1.0
+    final_hp = int(random.randint(base["min_hp"], base["max_hp"]) * affix["hp_mod"])
+    final_atk = int(base["atk"] * affix["atk_mod"] * weather_atk_mod)
+    
+    gold_min, gold_max = base["gold_range"]
+    gold_mod = affix["gold_mod"]
+    
+    return {
+        "name": f"{affix['prefix']}{base['name']} (Lv.{base['level']})",
+        "hp": final_hp, 
+        "max_hp": final_hp, 
+        "atk": final_atk,
+        "gold_range": (int(gold_min * gold_mod), int(gold_max * gold_mod)),
+        "exp": int(base["exp"] * affix["hp_mod"]),
+        "skill": affix["default_skill"] if chosen_base_type not in ("dragon", "cthulhu_avatar") else "🔥 世界Boss神格：免疫一切控制，有機率秒殺勇者！",
+        "drop_item": base["drop_item"], 
+        "spawn_map": map_name, 
+        "env": chosen_weather
+    }
