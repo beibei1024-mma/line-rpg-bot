@@ -22,7 +22,7 @@ def load_player(user_id):
         cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
         
-        # ⚡ 優化：當找不到玩家時，提早防錯插入並 commit，簡化邏輯流程
+        # 当找不到玩家時，提早防錯插入並 commit，簡化邏輯流程
         if not player:
             cur.execute(
                 "INSERT INTO players (user_id, hp, max_hp, level, exp, gold, weapon, enemy, strength, agility, intelligence, vitality, luck, sprit, job, attribute_points, last_sign_in, current_map, current_city) VALUES (%s, 100, 100, 1, 0, 0, '赤手空拳', NULL, 10, 10, 10, 10, 10, 10, '初心者', 0, 'None', '主城', '新手村')",
@@ -76,7 +76,7 @@ def make_battle_card(title, p, enemy):
     if current_mp is None: 
         current_mp = calculated_max_mp
     
-    # ⚡ 優化：進度條百分比計算改用更快速的常數邊界約束
+    # 進度條百分比計算改用更快速的常數邊界約束
     p_hp = p["hp"]
     p_pct = 0 if p_hp <= 0 else (100 if p_hp >= calculated_max_hp else int((p_hp / calculated_max_hp) * 100))
     mp_pct = 0 if current_mp <= 0 else (100 if current_mp >= calculated_max_mp else int((current_mp / calculated_max_mp) * 100))
@@ -99,13 +99,17 @@ def make_battle_card(title, p, enemy):
     contents.append({"type": "separator", "margin": "md"})
     contents.append({"type": "text", "text": str(title), "size": "sm", "wrap": True, "margin": "md", "color": "#E0E0E0"})
     
+    # 👾 怪物狀態渲染區（已加入數值顯示優化）
     if enemy: 
         e_hp = enemy["hp"]
         e_max = enemy["max_hp"]
         e_pct = 0 if e_hp <= 0 else (100 if e_hp >= e_max else int((e_hp / e_max) * 100))
+        
+        # ⚡ 核心優化點：比照角色面板，在怪物的血條上方安插精確的血量數值欄位
         contents.extend([
             {"type": "separator", "margin": "md"}, 
             {"type": "text", "text": f"👾 {enemy['name']}", "weight": "bold", "size": "md", "margin": "md", "color": "#FF3B30"}, 
+            {"type": "text", "text": f"血量: {e_hp}/{e_max}", "size": "xs", "color": "#8E8E93", "margin": "xs"}, # 👈 精準加入這行
             get_bar(e_pct, "#FF3B30")
         ])
         
@@ -136,7 +140,7 @@ def make_battle_card(title, p, enemy):
             QuickReplyItem(action=MessageAction(label="📆 每日簽到", text="簽到")),
             QuickReplyItem(action=MessageAction(label="⚒️ 遠古工坊NPC", text="工坊")),
             QuickReplyItem(action=MessageAction(label="🗼 試煉之塔", text="挑戰爬塔")),
-            QuickReplyItem(action=MessageAction(label="🌋 世界 Boss", text="世界Boss")),
+            QuickReplyItem(action=MessageAction(label="🌋 世界 Boss", text="挑戰世界Boss")),
             QuickReplyItem(action=MessageAction(label="🏪 補給商店", text="冒險商店")),
             QuickReplyItem(action=MessageAction(label="🛡️ 查看裝備", text="我的裝備")),
             QuickReplyItem(action=MessageAction(label="🎒 打開背包", text="我的背包")),
