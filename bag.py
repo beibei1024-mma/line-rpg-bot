@@ -50,9 +50,10 @@ def get_bag_card(p):
             pure_w_name = pure_w_name.split("】")[-1] if "】" in pure_w_name else pure_w_name
             pure_w_name = pure_w_name.strip()
             
-            if pure_w_name in weapons.SHOP_WEAPONS:
-                atk_val = weapons.SHOP_WEAPONS[pure_w_name]["atk_bonus"]
-                stat_text = f"💥 攻擊力 +{atk_val}"
+            pure_w_name = weapons.get_pure_weapon_name(eq_name)
+    if pure_w_name in weapons.SHOP_WEAPONS and pure_w_name != "赤手空拳":
+            atk_val = weapons.get_weapon_atk(eq_name)
+            stat_text = f"💥 攻擊力 +{atk_val}"
             else:
                 detected_slot = equipment_system.get_equipment_slot_by_name(eq_name) or "防具"
                 stat_text = f"🛡️ 部位：{detected_slot}"
