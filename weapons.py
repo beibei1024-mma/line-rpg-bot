@@ -1,9 +1,10 @@
-# ⚔️ 企劃一：世界級 20 大神兵利器傷害屬性大數據庫
-# ⚡ 數值 Bug 修正：已將「新手鐵短劍」的 atk_bonus 從 15000 修正為 15，維持前中後期遊戲的平衡性！
+# ⚔️ 世界級神兵利器傷害屬性大數據庫
+
 SHOP_WEAPONS = {
     "赤手空拳": {"atk_bonus": 0, "price": 0, "desc": "毫無攻擊力，只能用拳頭捶史萊姆。"},
     "新手鐵短劍": {"atk_bonus": 15, "price": 150, "desc": "新手村鐵匠打造的短劍，輕巧好用。"},
     "微光木藤弓": {"atk_bonus": 45, "price": 800, "desc": "採集微光森林的百年古藤編織而成的弓。"},
+    "見習魔法杖": {"atk_bonus": 95, "price": 2500, "desc": "鑲嵌極地不融冰塊打造的導魔法杖，魔力流轉順暢。"},
     "凜冬不融碎冰刺": {"atk_bonus": 95, "price": 2500, "desc": "寒冰極地萬年不化寒冰磨製成的致命冰刺。"},
     "黑曜熔岩大劍": {"atk_bonus": 160, "price": 6000, "desc": "炙熱熔岩淬火而成的重劍，揮砍時夾帶熱浪。"},
     "荒漠斬馬刀": {"atk_bonus": 240, "price": 12000, "desc": "骷髏荒漠流浪強盜頭目愛用的破防巨刃。"},
@@ -24,3 +25,32 @@ SHOP_WEAPONS = {
     "末日審判 Odin 之槍": {"atk_bonus": 75000, "price": 20000000, "desc": "諸神黃昏戰場中主神奧丁遺留下的至高誓約勝利之槍。"},
     "GM滅世制裁之劍": {"atk_bonus": 30000, "price": 0, "desc": "開發者測試專用，一刀秒殺萬物。"}
 }
+
+RARITY_MULTIPLIERS = {
+    "👑遠古神話": 2.0,
+    "🔥史詩": 1.5,
+    "🌟稀有": 1.25,
+    "🔷魔法": 1.1,
+    "⭐普通": 1.0
+}
+
+def get_pure_weapon_name(eq_name):
+    """清洗品質前綴與特殊符號，還原基礎武器名"""
+    if not eq_name:
+        return "赤手空拳"
+    pure = eq_name.split(" ] 的 ")[-1] if " ] 的 " in eq_name else eq_name
+    pure = pure.split("】")[-1] if "】" in pure else pure
+    for prefix in RARITY_MULTIPLIERS.keys():
+        pure = pure.replace(prefix, "")
+    return pure.strip()
+
+def get_weapon_atk(eq_name):
+    """計算包含工坊品質加成後的實際武器攻擊力"""
+    if not eq_name or eq_name == "赤手空拳":
+        return 0
+    pure_name = get_pure_weapon_name(eq_name)
+    base_atk = SHOP_WEAPONS.get(pure_name, {}).get("atk_bonus", 0)
+    for prefix, mult in RARITY_MULTIPLIERS.items():
+        if prefix in eq_name:
+            return int(base_atk * mult)
+    return base_atk
