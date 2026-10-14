@@ -25,8 +25,8 @@ def get_status_card(p):
     men_val = int(p.get("sprit", 10 + (level * 2)) * men_mod)
     free_pts = p.get("attribute_points", 0)
     
-    current_weapon = p["weapon"]
-    w_bonus = weapons.SHOP_WEAPONS[current_weapon]["atk_bonus"] if current_weapon in weapons.SHOP_WEAPONS else 0
+    current_weapon = p.get("weapon", "赤手空拳")
+    w_bonus = weapons.get_weapon_atk(current_weapon) + int(p.get("forge_weapon_bonus", 0))
     p_atk_single = 12 + str_val + w_bonus
     m_atk_single = 10 + int_val
     
