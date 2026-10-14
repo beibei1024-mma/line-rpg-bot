@@ -8,44 +8,42 @@ def get_status_card(p):
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
-    
-    # ⚡ 優化：將屬性乘數快取為本地變數，消除後續計算中對 job_mod 字典的重複 Key 檢索虛耗
+
     str_mod = job_mod["str_mod"]
     agi_mod = job_mod["agi_mod"]
     int_mod = job_mod["int_mod"]
     vit_mod = job_mod["vit_mod"]
     luk_mod = job_mod["luk_mod"]
     men_mod = job_mod["men_mod"]
-    
+
     str_val = int(p.get("strength", 10 + (level * 3)) * str_mod)
     agi_val = int(p.get("agility", 10 + (level * 2)) * agi_mod)
     int_val = int(p.get("intelligence", 10 + (level * 2)) * int_mod)
     vit_val = int(p.get("vitality", 10 + (level * 3)) * vit_mod)
     luk_val = int(p.get("luck", 10 + (level * 1)) * luk_mod)
     men_val = int(p.get("sprit", 10 + (level * 2)) * men_mod)
+
     free_pts = p.get("attribute_points", 0)
-    
     current_weapon = p.get("weapon", "赤手空拳")
     w_bonus = weapons.get_weapon_atk(current_weapon) + int(p.get("forge_weapon_bonus", 0))
+
     p_atk_single = 12 + str_val + w_bonus
     m_atk_single = 10 + int_val
-    
     p_def = vit_val // 2
     m_def = men_val // 2
-    
+
     double_chance = min(60, 2 + (agi_val // 6))
     crit_chance = min(80, 10 + (luk_val // 5))
-    
     calculated_max_hp = 100 + (vit_val * 5) + (level * 15)
     calculated_max_mp = 50 + (men_val * 4) + (level * 5)
-    
+
     current_mp = p.get("mp")
     if current_mp in (None, "None"):
         current_mp = calculated_max_mp
         p["mp"] = calculated_max_mp
-    
+
     status_color = "#FFCC00" if free_pts > 0 else "#8E8E93"
-    
+
     flex_bubble = {
         "type": "bubble",
         "styles": {"body": {"backgroundColor": "#111111"}},
@@ -56,6 +54,7 @@ def get_status_card(p):
                 {"type": "separator", "color": "#333333"},
                 {"type": "box", "layout": "vertical", "spacing": "xs", "contents": [
                     {"type": "text", "text": f"🎭 目前職業：🔥【{current_job}】", "size": "sm", "color": "#007AFF", "weight": "bold"},
+                    {"type": "text", "text": f"⚔️ 主手武器：【{current_weapon}】", "size": "xs", "color": "#4CD964"},
                     {"type": "text", "text": f"💰 擁有金幣：🪙 {p['gold']}", "size": "sm", "color": "#FFD700"},
                     {"type": "text", "text": f"🌟 經驗進度：{p['exp']} / {level * 50}", "size": "sm", "color": "#AF52DE"},
                     {"type": "text", "text": f"✨ 剩餘潛能點數：{free_pts} 點", "size": "sm", "color": status_color, "weight": "bold"}
@@ -94,7 +93,7 @@ def get_status_card(p):
             ]
         }
     }
-    
+
     if free_pts > 0:
         flex_bubble["footer"] = {
             "type": "box", "layout": "vertical", "backgroundColor": "#1C1C1E",
@@ -107,34 +106,37 @@ def get_status_card(p):
         QuickReplyItem(action=MessageAction(label="🏪 補給商店", text="冒險商店")),
         QuickReplyItem(action=MessageAction(label="🦅 返回城鎮", text="回城"))
     ]
-    return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items)}
+    return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items).to_dict()}
 
 def handle_resurrect(p):
-    """😇 【復活大腦重構】全面升級為一體化 Dict 智慧組合包，全自動清洗狀態與重設主城小標籤"""
+    """😇 復活大腦：全自動清洗狀態與重設主城小標籤"""
     if p["hp"] > 0:
         card = db_core.make_battle_card("💡 提示：勇者！你目前明明生命值健全，不需要使用復活神術。", p, None)
         return {"flex": card["flex"], "quick_reply": card["quick_reply"]}
-        
+
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
-    
-    # ⚡ 優化：與上面同步實施快取，優化數值計算開銷
+
     vit_val = int(p.get("vitality", 10 + (level * 3)) * job_mod["vit_mod"])
     men_val = int(p.get("sprit", 10 + (level * 2)) * job_mod["men_mod"])
-    
     max_hp = 100 + (vit_val * 5) + (level * 15)
     max_mp = 50 + (men_val * 4) + (level * 5)
-    
-    # ✨ 核心復活數值改寫
+
     p["hp"] = max_hp
     p["mp"] = max_mp
     p["current_map"] = "主城"
     p["enemy"] = None
-    p["gold"] = max(0, p["gold"] - 20) 
+    p["gold"] = max(0, p["gold"] - 20)
     db_core.save_player(p)
-    
-    log_text = f"😇 ✨ 👼 【 神聖天使・復活術成功 】 👼 ✨ 😇\n─────────────────\n世界樹的讚美詩響起！璀璨的光明法陣在虛空中張開，你被泉水聖光溫柔包覆！\n\n💖 狀態恢復：生命值與魔力值全數充滿爆表 ── 【 🟢 FULL HP/MP 】！\n🏙️ 時空轉移：靈魂已安穩重塑於皇家安全起點 ── 📍【 主城 】！\n🪙 公會稅收：修復靈魂扣除工本費 20 金幣。"
-    
+
+    log_text = (
+        "😇 ✨ 👼 【 神聖天使・復活術成功 】 👼 ✨ 😇\n"
+        "─────────────────\n"
+        "世界樹的讚美詩響起！璀璨的光明法陣在虛空中張開，你被泉水聖光溫柔包覆！\n\n"
+        "💖 狀態恢復：生命值與魔力值全數充滿爆表 ── 【 🟢 FULL HP/MP 】！\n"
+        "🏙️ 時空轉移：靈魂已安穩重塑於皇家安全起點 ── 📍【 主城 】！\n"
+        "🪙 公會稅收：修復靈魂扣除工本費 20 金幣。"
+    )
     card = db_core.make_battle_card(log_text, p, None)
     return {"flex": card["flex"], "quick_reply": card["quick_reply"]}
