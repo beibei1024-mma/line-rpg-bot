@@ -1,4 +1,4 @@
-# db_core.py - 資料庫連接池與主卡片生成器 (完整黑市與快速導航按鈕版)
+# db_core.py - 資料庫連接池與主卡片生成器 (完整按鈕與黑市選單版)
 
 import os
 import json
@@ -198,7 +198,7 @@ def make_battle_card(title, p, enemy):
             QuickReplyItem(action=MessageAction(label="📆 簽到", text="簽到")),
             QuickReplyItem(action=MessageAction(label="⚒️ 工坊", text="工坊")),
             QuickReplyItem(action=MessageAction(label="🏪 商店", text="冒險商店")),
-            QuickReplyItem(action=MessageAction(label="🏪 黑市", text="黑市")),
+            QuickReplyItem(action=MessageAction(label="🖤 黑市", text="黑市")),
             QuickReplyItem(action=MessageAction(label="🗼 爬塔", text="挑戰爬塔")),
             QuickReplyItem(action=MessageAction(label="🌋 世界Boss", text="挑戰世界Boss")),
             QuickReplyItem(action=MessageAction(label="🛡️ 裝備", text="我的裝備")),
