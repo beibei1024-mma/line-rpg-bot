@@ -1,4 +1,4 @@
-# forge_system.py - 皇家禁忌工坊與全身14欄位動態裝備面板 v7.0 (支援單一卸下與一鍵全部脫下)
+# forge_system.py - 皇家禁忌工坊與全身14欄位動態裝備面板 v7.1 (字體顯示防呆版)
 
 import json
 import random
@@ -136,7 +136,6 @@ def get_equipment_card(p):
             color = "#4CD964"
             st = equipment_core.parse_equipment_stats(eq_name)
             stat_str = " (" + st['summary'] + ")"
-            # 建立單一卸下按鈕指令（例如：脫下 頭盔、脫下 武器）
             slot_key_name = label.replace("⚔️ ", "").replace("🪖 ", "").replace("🥋 ", "").replace("👖 ", "").replace("👢 ", "").replace("📿 ", "").replace("💍 ", "").replace("⌚ ", "").replace("🛡️ ", "").replace("🎖️ ", "").strip()
             btn_action = {"type": "message", "label": "卸下", "text": "脫下 " + slot_key_name}
 
@@ -154,7 +153,6 @@ def get_equipment_card(p):
             })
         contents.append(row_box)
 
-    # 一鍵全部脫下按鈕
     contents.append({
         "type": "button", "style": "primary", "color": "#8E8E93", "height": "sm", "marginTop": "md",
         "action": {"type": "message", "label": "❌ 一鍵全部卸下放回背包", "text": "全部脫下"}
@@ -175,11 +173,9 @@ def get_equipment_card(p):
     return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items).to_dict()}
 
 def execute_unequip_item(p, user_msg):
-    """🛠️ 支援單一部位卸下與全部卸下的高階腦"""
     clean_cmd = user_msg.replace("脫下", "").replace("卸下", "").replace(" ", "").strip()
     
     if clean_cmd in ("全部", "所有", "裝備"):
-        # 全部卸下
         slot_fields = [
             "weapon", "helmet", "armor", "pants", "shoes", "necklace",
             "ring1", "ring2", "bracelet", "sub_hand", "badge",
@@ -203,7 +199,6 @@ def execute_unequip_item(p, user_msg):
             return "💡 您目前身上沒有穿戴任何可卸下的裝備！"
         return "❌ 🛡️ 【一鍵全部卸下成功】\n─────────────────\n您已將身上所有 " + str(unequipped_count) + " 件裝備安全解下，全部原封不動存入您的背包！"
 
-    # 單一部位卸下映射
     slot_map = {
         "武器": "weapon", "頭盔": "helmet", "上衣": "armor", "下褲": "pants",
         "鞋子": "shoes", "項鍊": "necklace", "戒指1": "ring1", "戒指2": "ring2",
@@ -212,7 +207,7 @@ def execute_unequip_item(p, user_msg):
 
     target_field = slot_map.get(clean_cmd)
     if not target_field:
-        return "❌ 卸下失敗！找不到【" + clean_cmd + "】這個裝備部位。範例：輸入【脫下 頭盔】或點擊面板按鈕。"
+        return "❌ 卸下失敗！找不到【" + clean_cmd + "】這個裝備部位。"
 
     current_eq = p.get(target_field, "無" if target_field != "weapon" else "赤手空拳")
     if current_eq in ("無", "赤手空拳"):
