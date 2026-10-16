@@ -17,22 +17,22 @@ def handle_job_transfer(event, line_bot_api, p, user_msg, configuration):
     target_job = user_msg.replace("轉職", "").strip()
 
     if target_job not in jobs.JOBS_DATA:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 轉職失敗！不存在【{target_job}】。"))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 轉職失敗！不存在【" + target_job + "】。"))
         return
 
     target_info = jobs.JOBS_DATA[target_job]
     if target_job not in job_mod["next_jobs"]:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 轉職失敗！【{current_job}】無法進階為【{target_job}】。"))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 轉職失敗！【" + current_job + "】無法進階為【" + target_job + "】。"))
         return
 
     if level < target_info["req_lvl"]:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔒 境界未到！需要 Lv.{target_info['req_lvl']}+，你目前 Lv.{level}。"))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🔒 境界未到！需要 Lv." + str(target_info['req_lvl']) + "+，你目前 Lv." + str(level) + "。"))
         return
 
     p["job"] = target_job
     db_core.save_player(p)
 
-    log_text = f"✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 恭喜！你正式進階為更高的職業形態 ── 🔥【{target_job}】！\n快輸入【我的狀態】或開啟戰鬥查看全新絕世天賦！"
+    log_text = "✨ 🎉 【本命階級突破成功】 🎉 ✨\n🛡️ 恭喜！你正式進階為更高的職業形態 ── 🔥【" + target_job + "】！\n快輸入【我的狀態】或開啟戰鬥查看全新絕世天賦！"
     card_data = db_core.make_battle_card(log_text, p, None)
 
     msg_payload = {
