@@ -1,4 +1,4 @@
-# battle_core.py - 純粹戰鬥調度中心 v4.0 (結合 combat_engine 與 loot_engine)
+# battle_core.py - 純粹戰鬥調度中心 v4.2 (內建防卡怪自動索敵機制)
 
 import random
 from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
@@ -9,9 +9,11 @@ import combat_engine
 import loot_engine
 import equipment_core
 import weapons
+import monsters
+import challenge_system
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【戰鬥主路由：完美接管攻擊、技能、擊殺與反擊】"""
+    """【戰鬥主路由：自動索敵與防卡怪完全體】"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA:
@@ -29,8 +31,26 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🔒 【天賦界限卡關中】請先完成手動天賦轉職！\n\n" + job_notice))
             return
 
-    if p["hp"] <= 0 or p["enemy"] is None:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 無法發動戰鬥（可能已陣亡或周圍沒有怪物）。"))
+    if p["hp"] <= 0:
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊底部【😇 祈求復活】按鈕。"))
+        return
+
+    # 🛡️ 防卡怪核心：如果玩家輸入攻擊或技能時剛好沒有怪，自動幫玩家產生一隻當前地圖的怪！
+    if p["enemy"] is None and (user_msg in ("攻擊", "尋找怪物", "尋怪") or user_msg.startswith("使用技能")):
+        current_location = p.get("current_map", "新手村")
+        if current_location == "世界Boss":
+            boss_hp = challenge_system.check_boss_rebirth_and_get_hp()
+            p["enemy"] = {
+                "name": challenge_system.WORLD_BOSS_NAME, "hp": boss_hp, "max_hp": challenge_system.WORLD_BOSS_TOTAL_HP,
+                "atk": 160, "gold_range": (1000, 5000), "exp": 5000, "skill": "👁️ 邪神神格：環境常駐【魔能潮汐】！",
+                "drop_item": "舊神支配者之眼", "env": "🔮 魔能潮汐 (全服大混戰，法術增幅異常狂暴)", "is_world_boss": True
+            }
+        else:
+            p["enemy"] = monsters.generate_random_monster(current_location)
+        db_core.save_player(p)
+
+    if p["enemy"] is None:
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 目前周圍沒有怪物，請點擊【🔍 尋找怪物】或傳送至野外冒險！"))
         return
 
     enemy = p["enemy"]
@@ -68,15 +88,12 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         total_p_dmg = atk_dmg
         log += atk_log
 
-    # 扣除怪物血量
     enemy["hp"] -= total_p_dmg
 
-    # 世界 Boss 戰功累計
     if enemy.get("is_world_boss") and total_p_dmg > 0:
         p["world_boss_damage"] = (p.get("world_boss_damage", 0) or 0) + total_p_dmg
         log += "🌋 【世界Boss討伐戰功】累計輸出：⚔️ " + str(p['world_boss_damage']) + " 點！\n"
 
-    # ── 5. 擊殺判定核心（交給 loot_engine 獨立處理金幣、經驗與掉寶） ──
     if enemy["hp"] <= 0:
         loot_log, is_job_locked = loot_engine.process_monster_defeat(p, enemy, configuration)
         log += loot_log
@@ -97,7 +114,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
     else:
-        # ── 6. 怪物殘存與反擊 ──
         base_vit = p.get("vitality", 10) + eq_bonus["vitality"]
         vit_val = int(base_vit * job_mod["vit_mod"])
         if "暴雨滂沱" in enemy.get("env", ""):
