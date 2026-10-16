@@ -73,7 +73,6 @@ def get_maps_carousel(p):
     return {"type": "carousel", "contents": columns}
 
 def change_map(p, target_map):
-    """處理時空傳送邏輯：傳送後清空當前怪物，讓玩家點擊尋怪或點擊尋找怪獸後再開打"""
     target_map = target_map.replace("前往", "").replace("傳送", "").replace(" ", "").strip()
 
     if target_map not in MAPS_DATA:
@@ -91,7 +90,6 @@ def change_map(p, target_map):
 
     p["current_map"] = target_map
 
-    # 傳送時重設 enemy 為 None，讓玩家抵達後可以從容點擊「尋找怪物」
     if target_map == "世界Boss":
         import challenge_system
         boss_hp = challenge_system.check_boss_rebirth_and_get_hp()
