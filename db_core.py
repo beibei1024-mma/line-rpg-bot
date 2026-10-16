@@ -1,3 +1,5 @@
+# db_core.py - 資料庫連接池與主卡片生成器 (完整黑市與快速導航按鈕版)
+
 import os
 import json
 import psycopg2
@@ -6,8 +8,6 @@ from psycopg2.extras import RealDictCursor
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
 _db_pool_url = os.environ.get('DATABASE_URL')
-
-# ⚡ 效能優化：使用連線池取代每次重建 TCP/SSL 連線
 _connection_pool = None
 
 def get_db_connection():
@@ -36,7 +36,6 @@ def release_db_connection(conn):
         pass
 
 def load_player(user_id):
-    """即時雲端加載：每一次動作都去 Supabase 撈取最精準的 14 欄位裝備與 current_map 坐標"""
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     player = None
@@ -83,7 +82,6 @@ def load_player(user_id):
     return None
 
 def save_player(p):
-    """即時雲端儲存：將變更完畢的數值（含背包、裝備庫、MP、爬塔與世界Boss傷害）即時寫入 Supabase"""
     user_id = p['user_id']
     conn = get_db_connection()
     cur = conn.cursor()
@@ -148,16 +146,16 @@ def make_battle_card(title, p, enemy):
     def get_bar(pct, color):
         return {
             "type": "box", "layout": "vertical", "backgroundColor": "#2A2A2A", "height": "10px", "cornerRadius": "5px", "margin": "xs",
-            "contents": [{"type": "box", "layout": "vertical", "backgroundColor": color, "width": f"{pct}%", "height": "10px", "cornerRadius": "5px", "contents": []}]
+            "contents": [{"type": "box", "layout": "vertical", "backgroundColor": color, "width": str(pct) + "%", "height": "10px", "cornerRadius": "5px", "contents": []}]
         }
 
     contents = []
     if p_hp <= 0:
         header_title = "☠️ 勇者不幸陣亡 ☠️"
     elif p.get("current_map") == "主城":
-        header_title = f"🏙️ 皇家安全區：{p.get('current_city', '新手村')}"
+        header_title = "🏙️ 皇家安全區：" + p.get('current_city', '新手村')
     else:
-        header_title = f"🌲 副本/野外危險區：{p.get('current_map', '未知領域')}"
+        header_title = "🌲 副本/野外危險區：" + p.get('current_map', '未知領域')
 
     contents.append({"type": "text", "text": header_title, "weight": "bold", "size": "md", "align": "center", "color": "#FFFFFF"})
     contents.append({"type": "separator", "margin": "md"})
@@ -171,15 +169,15 @@ def make_battle_card(title, p, enemy):
         boss_title_color = "#FF1F1F" if is_wb else "#FF3B30"
         contents.extend([
             {"type": "separator", "margin": "md"},
-            {"type": "text", "text": f"{enemy['name']}", "weight": "bold", "size": "md", "margin": "md", "color": boss_title_color},
-            {"type": "text", "text": f"血量殘餘: {e_hp} / {e_max}", "size": "xs", "color": "#FF8383" if is_wb else "#8E8E93", "margin": "xs", "weight": "bold" if is_wb else "regular"},
+            {"type": "text", "text": str(enemy['name']), "weight": "bold", "size": "md", "margin": "md", "color": boss_title_color},
+            {"type": "text", "text": "血量殘餘: " + str(e_hp) + " / " + str(e_max), "size": "xs", "color": "#FF8383" if is_wb else "#8E8E93", "margin": "xs", "weight": "bold" if is_wb else "regular"},
             get_bar(e_pct, "#FF1F1F" if is_wb else "#FF3B30")
         ])
 
     contents.extend([
         {"type": "separator", "margin": "md"},
-        {"type": "text", "text": f"👤 勇者：【 {p_name} 】 ({current_job} Lv.{p['level']})", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"},
-        {"type": "text", "text": f"血量: {p_hp}/{calculated_max_hp}  |  魔力: {current_mp}/{calculated_max_mp}", "size": "xs", "color": "#8E8E93", "margin": "xs"},
+        {"type": "text", "text": "👤 勇者：【 " + p_name + " 】 (" + current_job + " Lv." + str(p['level']) + ")", "weight": "bold", "size": "md", "margin": "md", "color": "#007AFF"},
+        {"type": "text", "text": "血量: " + str(p_hp) + "/" + str(calculated_max_hp) + "  |  魔力: " + str(current_mp) + "/" + str(calculated_max_mp), "size": "xs", "color": "#8E8E93", "margin": "xs"},
         get_bar(p_pct, "#4CD964"), get_bar(mp_pct, "#34AADC")
     ])
 
@@ -193,27 +191,28 @@ def make_battle_card(title, p, enemy):
         quick_items.append(QuickReplyItem(action=MessageAction(label="🛡️ 技能防禦", text="使用技能防禦")))
         for s_name, s_info in job_mod.get("skills", {}).items():
             if s_info.get("type") == "active" and s_name != "普通攻擊":
-                quick_items.append(QuickReplyItem(action=MessageAction(label=f"🔮 {s_name}", text=f"使用技能 {s_name}")))
+                quick_items.append(QuickReplyItem(action=MessageAction(label="🔮 " + s_name, text="使用技能 " + s_name)))
         quick_items.append(QuickReplyItem(action=MessageAction(label="🏃 轉身逃跑", text="逃跑")))
     elif p.get("current_map") == "主城":
         quick_items.extend([
-            QuickReplyItem(action=MessageAction(label="📆 每日簽到", text="簽到")),
-            QuickReplyItem(action=MessageAction(label="⚒️ 遠古工坊NPC", text="工坊")),
-            QuickReplyItem(action=MessageAction(label="🗼 試煉之塔", text="挑戰爬塔")),
-            QuickReplyItem(action=MessageAction(label="🌋 世界 Boss", text="挑戰世界Boss")),
-            QuickReplyItem(action=MessageAction(label="🏪 補給商店", text="冒險商店")),
-            QuickReplyItem(action=MessageAction(label="🛡️ 查看裝備", text="我的裝備")),
-            QuickReplyItem(action=MessageAction(label="🎒 打開背包", text="我的背包")),
-            QuickReplyItem(action=MessageAction(label="🚪 出城冒險", text="世界地圖"))
+            QuickReplyItem(action=MessageAction(label="📆 簽到", text="簽到")),
+            QuickReplyItem(action=MessageAction(label="⚒️ 工坊", text="工坊")),
+            QuickReplyItem(action=MessageAction(label="🏪 商店", text="冒險商店")),
+            QuickReplyItem(action=MessageAction(label="🏪 黑市", text="黑市")),
+            QuickReplyItem(action=MessageAction(label="🗼 爬塔", text="挑戰爬塔")),
+            QuickReplyItem(action=MessageAction(label="🌋 世界Boss", text="挑戰世界Boss")),
+            QuickReplyItem(action=MessageAction(label="🛡️ 裝備", text="我的裝備")),
+            QuickReplyItem(action=MessageAction(label="🎒 背包", text="我的背包")),
+            QuickReplyItem(action=MessageAction(label="🚪 出城", text="世界地圖"))
         ])
     else:
         quick_items.extend([
             QuickReplyItem(action=MessageAction(label="🔍 尋找怪物", text="尋怪")),
-            QuickReplyItem(action=MessageAction(label="👤 我的狀態", text="我的狀態")),
-            QuickReplyItem(action=MessageAction(label="🎒 打開背包", text="我的背包")),
-            QuickReplyItem(action=MessageAction(label="🦅 飛回城鎮", text="回城"))
+            QuickReplyItem(action=MessageAction(label="👤 狀態", text="我的狀態")),
+            QuickReplyItem(action=MessageAction(label="🎒 背包", text="我的背包")),
+            QuickReplyItem(action=MessageAction(label="🦅 回城", text="回城"))
         ])
 
-    # LINE QuickReply 上限為 13 個按鈕，並統一轉為 dict 避免 v3 序列化錯誤
     qr_dict = QuickReply(items=quick_items[:13]).to_dict()
     return {"flex": flex_bubble, "quick_reply": qr_dict}
+# === END OF FILE ===
