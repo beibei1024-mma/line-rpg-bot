@@ -1,4 +1,4 @@
-# combat_engine.py - 皇家戰鬥傷害與技能奧義計算獨立核心
+# combat_engine.py - 皇家戰鬥傷害與技能奧義計算獨立核心 (字串安全完整版)
 
 import random
 import weapons
@@ -27,9 +27,9 @@ def calculate_player_attack(p, job_mod, eq_bonus, w_bonus):
     d1 = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
     if random.random() < crit_chance:
         d1 = int(d1 * crit_dmg_mod)
-        log += f"💥 致命爆擊！第 1 擊斬出 {d1} 點爆擊物理傷害！\n"
+        log += "💥 致命爆擊！第 1 擊斬出 " + str(d1) + " 點爆擊物理傷害！\n"
     else:
-        log += f"⚔️ 第 1 擊普通命中，造成 {d1} 點物理傷害！\n"
+        log += "⚔️ 第 1 擊普通命中，造成 " + str(d1) + " 點物理傷害！\n"
     total_dmg += d1
 
     # 第 2 擊（連擊）
@@ -37,9 +37,9 @@ def calculate_player_attack(p, job_mod, eq_bonus, w_bonus):
         d2 = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
         if random.random() < crit_chance:
             d2 = int(d2 * crit_dmg_mod)
-            log += f"💥 致命爆擊！第 2 擊斬出 {d2} 點爆擊物理傷害！\n"
+            log += "💥 致命爆擊！第 2 擊斬出 " + str(d2) + " 點爆擊物理傷害！\n"
         else:
-            log += f"⚔️ 第 2 擊普通命中，造成 {d2} 點物理傷害！\n"
+            log += "⚔️ 第 2 擊普通命中，造成 " + str(d2) + " 點物理傷害！\n"
         total_dmg += d2
 
     return total_dmg, log
@@ -70,7 +70,7 @@ def calculate_skill_attack(p, job_mod, eq_bonus, w_bonus, skill_name):
         old_h = p["hp"]
         max_hp_val = 100 + (vit_val * 5) + (level * 15)
         p["hp"] = min(max_hp_val, p["hp"] + heal)
-        log += f"💖 聖光治癒！神聖恢復了生命值 +{p['hp'] - old_h} 點！\n"
+        log += "💖 聖光治癒！神聖恢復了生命值 +" + str(p['hp'] - old_h) + " 點！\n"
         if skill_name in ("淨化術", "復活預言"):
             log += "✨ 聖光護體！本回合防禦力額外提升 2 倍！\n"
         return 0, log
@@ -80,8 +80,10 @@ def calculate_skill_attack(p, job_mod, eq_bonus, w_bonus, skill_name):
         skill_name, base_weapon_atk, int_val, vit_val, str_val, agi_val, luk_val, men_val
     )
     total_dmg = calc_res["damage"]
-    if calc_res["log"]:
-        log += calc_res["log"]
+    if calc_res.get("log"):
+        # 安全替換技能對話中的怪物名稱
+        formatted_skill_log = calc_res["log"].replace("{enemy_name}", "{enemy_name}")
+        log += formatted_skill_log
 
     return total_dmg, log
 # === END OF FILE ===
