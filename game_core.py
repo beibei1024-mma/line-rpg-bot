@@ -1,4 +1,4 @@
-# game_core.py - 皇家分流主控台 v4.6 (支援單一與全部脫裝路由)
+# game_core.py - 皇家分流主控台 v4.7 (逃跑路由最高優先級版)
 
 import random
 import datetime
@@ -175,7 +175,7 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "更換裝備結果", card_data)
         return
 
-    # 10. 卸下裝備（支援「脫下 頭盔」、「全部脫下」等指令）
+    # 10. 卸下裝備
     if user_msg.startswith("脫下") or user_msg.startswith("卸下") or user_msg == "全部脫下":
         res_text = forge_system.execute_unequip_item(p, user_msg)
         card_data = db_core.make_battle_card(res_text, p, p["enemy"])
@@ -189,7 +189,7 @@ def process_game_logic(event, line_bot_api, configuration):
         return
 
     # 12. 喝藥水
-    if user_msg.startswith("使用") and not user_msg.startswith("使用技能"):
+    if user_msg.startswith("use") or (user_msg.startswith("使用") and not user_msg.startswith("使用技能")):
         potion_name = user_msg.replace("使用", "").strip()
         line_bot_api.reply_message(
             event.reply_token,
@@ -215,7 +215,12 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "時空傳送結果", card_data)
         return
 
-    # 15. 主城安全區指令導流（黑市與商店優先於戰鬥導流）
+    # 📌 15. 【逃跑指令】最高優先級攔截（確保點擊逃跑絕不誤判成攻擊）
+    if user_msg == "逃跑":
+        battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
+        return
+
+    # 16. 主城安全區指令導流
     if current_loc == "主城":
         if user_msg == "黑市":
             line_bot_api.reply_message(
@@ -310,15 +315,15 @@ def process_game_logic(event, line_bot_api, configuration):
             )
             return
 
-    # 16. 戰鬥中行動
+    # 17. 戰鬥中行動（攻擊、尋怪、技能）
     if p["enemy"] is not None:
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
         return
-    if user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
+    if user_msg in ("尋找怪物", "尋怪") or user_msg.startswith("使用技能") or user_msg == "使用技能防禦" or user_msg == "攻擊":
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
         return
 
-    # 17. 野外限制隔離牆
+    # 18. 野外限制隔離牆
     is_city_cmd = any(user_msg.startswith(cmd) or user_msg == cmd for cmd in CITY_ONLY_COMMANDS)
     if is_city_cmd and current_loc != "主城":
         warn_text = (
