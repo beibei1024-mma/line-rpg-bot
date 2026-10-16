@@ -1,4 +1,4 @@
-# battle_core.py - 純粹戰鬥調度中心 v4.2 (內建防卡怪自動索敵機制)
+# battle_core.py - 純粹戰鬥調度中心 v4.3 (尋怪與攻擊嚴格分離版)
 
 import random
 from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
@@ -13,7 +13,7 @@ import monsters
 import challenge_system
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【戰鬥主路由：自動索敵與防卡怪完全體】"""
+    """【戰鬥主路由：尋怪與攻擊嚴格分離】"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA:
@@ -35,22 +35,36 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊底部【😇 祈求復活】按鈕。"))
         return
 
-    # 🛡️ 防卡怪核心：如果玩家輸入攻擊或技能時剛好沒有怪，自動幫玩家產生一隻當前地圖的怪！
-    if p["enemy"] is None and (user_msg in ("攻擊", "尋找怪物", "尋怪") or user_msg.startswith("使用技能")):
+    # 2. 🔍 尋找怪物處理（純粹遭遇怪物，絕對不主動揮出第一刀！）
+    if user_msg in ("尋找怪物", "尋怪"):
+        if p[" enemy"] is not None and not p["enemy"].get("is_world_boss"):
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚔️ 眼前還有怪物！請發動【攻擊】或施放職業技能！"))
+            return
+
         current_location = p.get("current_map", "新手村")
         if current_location == "世界Boss":
             boss_hp = challenge_system.check_boss_rebirth_and_get_hp()
-            p["enemy"] = {
+            random_monster = {
                 "name": challenge_system.WORLD_BOSS_NAME, "hp": boss_hp, "max_hp": challenge_system.WORLD_BOSS_TOTAL_HP,
                 "atk": 160, "gold_range": (1000, 5000), "exp": 5000, "skill": "👁️ 邪神神格：環境常駐【魔能潮汐】！",
                 "drop_item": "舊神支配者之眼", "env": "🔮 魔能潮汐 (全服大混戰，法術增幅異常狂暴)", "is_world_boss": True
             }
         else:
-            p["enemy"] = monsters.generate_random_monster(current_location)
+            random_monster = monsters.generate_random_monster(current_location)
+        
+        p["enemy"] = random_monster
         db_core.save_player(p)
 
+        title_log = "⚠️ 遭遇強敵！在📍【" + current_location + "】撞見了對手！\n\n📢 環境狀態：" + random_monster['env'] + "\n🔰 怪物被動：" + random_monster['skill']
+        card_data = db_core.make_battle_card(title_log, p, random_monster)
+        msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "遭遇怪物", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+        return
+
+    # 若沒有怪卻點了攻擊，提示尋找怪物
     if p["enemy"] is None:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 目前周圍沒有怪物，請點擊【🔍 尋找怪物】或傳送至野外冒險！"))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 目前周圍沒有怪物，請點擊底部【🔍 尋找怪物】來遭遇對手！"))
         return
 
     enemy = p["enemy"]
