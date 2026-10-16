@@ -40,7 +40,7 @@ def handle_job_transfer(event, line_bot_api, p, user_msg, configuration):
         MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
 
 def check_level_lock(p, job_mod):
-    """🔒 核心卡等判定：檢查經驗值是否撞上轉職瓶頸死鎖，並完整提升六維屬性"""
+    """🔒 核心卡等判定：檢查經驗值是否撞上轉職瓶頸死鎖，升級時同步充滿血量與魔力"""
     is_job_locked = False
     p_level = p["level"]
     p_exp = p["exp"]
@@ -75,4 +75,14 @@ def check_level_lock(p, job_mod):
 
     p["level"] = p_level
     p["exp"] = p_exp
+
+    # ✨ 關鍵修復：升級成功後，即時計算最新等級與裝備加成下的最大 HP/MP 並全面補滿！
+    import equipment_core
+    eq_bonus = equipment_core.get_player_total_equipment_bonus(p)
+    vit_val = int((p.get("vitality", 10) + eq_bonus["vitality"]) * job_mod["vit_mod"])
+    men_val = int((p.get("sprit", 10) + eq_bonus["sprit"]) * job_mod["men_mod"])
+    
+    p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
+    p["mp"] = 50 + (men_val * 4) + (p["level"] * 5)
+
     return is_job_locked
