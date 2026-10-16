@@ -1,4 +1,4 @@
-# dynamic_market.py - 皇家時空動態黑市交易中心 v4.0 (獨立裝備背包完全連通版)
+# dynamic_market.py - 皇家時空動態黑市交易中心 v4.1 (完整獨立背包對接版)
 
 import random
 import time
@@ -30,7 +30,7 @@ def refresh_shop_stock(p):
         new_goods.append({
             "index": i + 1, "type": "potion", "name": p_name,
             "price": int(orig_price * discount),
-            "discount_label": f"🔥 {int(discount*10)}折" if discount < 1.0 else "制式價",
+            "discount_label": "🔥 " + str(int(discount*10)) + "折" if discount < 1.0 else "制式價",
             "stock": random.randint(3, 8), "data": {}
         })
 
@@ -42,7 +42,7 @@ def refresh_shop_stock(p):
         eq_data = equipment_core.generate_random_equipment(r_slot, r_base)
         new_goods.append({
             "index": i + 3, "type": "equipment", "name": eq_data["name"],
-            "price": eq_data["price"], "discount_label": f"✨ {eq_data['rarity']}",
+            "price": eq_data["price"], "discount_label": "✨ " + str(eq_data['rarity']),
             "stock": 1, "data": eq_data
         })
 
@@ -63,26 +63,26 @@ def get_market_flex(p):
     goods = refresh_shop_stock(p)
     contents = [
         {"type": "text", "text": "🏪 皇家暗黑動態時空黑市", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-        {"type": "text", "text": f"🪙 金幣：{p['gold']} | ⏳ 每小時全自動更新", "size": "xs", "color": "#FFCC00", "align": "center", "margin": "xs"},
+        {"type": "text", "text": "🪙 金幣：" + str(p['gold']) + " | ⏳ 每小時全自動更新", "size": "xs", "color": "#FFCC00", "align": "center", "margin": "xs"},
         {"type": "separator", "margin": "sm", "color": "#333333"}
     ]
 
     for item in goods:
-        stock_text = f"庫存: {item['stock']}" if item['stock'] > 0 else "🛑 售罄"
+        stock_text = "庫存: " + str(item['stock']) if item['stock'] > 0 else "🛑 售罄"
         btn_color = "#444444" if item['stock'] <= 0 else ("#FF9500" if item["type"] == "mystery_box" else "#1478FF")
         contents.append({
             "type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
             "contents": [
                 {"type": "box", "layout": "horizontal", "contents": [
-                    {"type": "text", "text": f"📦 [{item['index']}] {item['name']}", "size": "xs", "color": "#E0E0E0", "weight": "bold", "flex": 4},
+                    {"type": "text", "text": "📦 [" + str(item['index']) + "] " + item['name'], "size": "xs", "color": "#E0E0E0", "weight": "bold", "flex": 4},
                     {"type": "text", "text": item["discount_label"], "size": "xs", "color": "#FF3B30", "align": "end", "flex": 2}
                 ]},
                 {"type": "box", "layout": "horizontal", "margin": "xs", "contents": [
-                    {"type": "text", "text": f"🪙 價格：{item['price']}", "size": "xxs", "color": "#FFCC00", "flex": 1},
+                    {"type": "text", "text": "🪙 價格：" + str(item['price']), "size": "xxs", "color": "#FFCC00", "flex": 1},
                     {"type": "text", "text": stock_text, "size": "xxs", "color": "#4CD964" if item['stock'] > 0 else "#FF3B30", "align": "end", "flex": 1}
                 ]},
                 {"type": "button", "style": "primary", "color": btn_color, "height": "sm", "marginTop": "xs",
-                 "action": {"type": "message", "label": "🛒 立即採購" if item['stock'] > 0 else "❌ 已售罄", "text": f"黑市購買 {item['index']}"}}
+                 "action": {"type": "message", "label": "🛒 立即採購" if item['stock'] > 0 else "❌ 已售罄", "text": "黑市購買 " + str(item['index'])}}
             ]
         })
 
@@ -102,16 +102,16 @@ def execute_market_buy(p, idx_str):
     if target_item["stock"] <= 0:
         return "❌ 該限量商品已被採購一空！"
     if p["gold"] < target_item["price"]:
-        return f"❌ 金幣不足！需要 {target_item['price']} 金幣！"
+        return "❌ 金幣不足！需要 " + str(target_item['price']) + " 金幣！"
 
     p["gold"] -= target_item["price"]
     target_item["stock"] -= 1
     p["shop_goods"] = goods
 
-    log = f"🛒 交易成功！花費 🪙 {target_item['price']} 金幣購買了 "
+    log = "🛒 交易成功！花費 🪙 " + str(target_item['price']) + " 金幣購買了 "
     if target_item["type"] == "potion":
         bag.add_to_inventory(p, target_item["name"], is_material=False)
-        log += f"🧪【{target_item['name']}】！"
+        log += "🧪【" + target_item['name'] + "】！"
     elif target_item["type"] in ["equipment", "mystery_box"]:
         slots = ["武器", "頭盔", "鎧甲", "護手", "鞋子", "飾品"]
         r_slot = random.choice(slots)
@@ -120,7 +120,8 @@ def execute_market_buy(p, idx_str):
         slot_map = {"鎧甲": "上衣", "護手": "手環", "飾品": "戒指1"}
         mapped_slot = slot_map.get(eq.get("slot", "武器"), eq.get("slot", "武器"))
         equipment_system.add_to_weapon_inventory_individual(p, eq["name"], slot_name=mapped_slot)
-        log += f"🛡️【{eq['name']}】！已送入裝備背包。"
+        log += "🛡️【" + eq['name'] + "】！已送入裝備背包。"
 
     db_core.save_player(p)
     return log
+# === END OF FILE ===
