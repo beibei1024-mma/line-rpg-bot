@@ -1,5 +1,8 @@
+# jobs_system.py - 皇家轉職與等級突破核心 (升級自動回滿血魔版)
+
 import jobs
 import db_core
+import equipment_core
 from linebot.v3.messaging import ApiClient, ReplyMessageRequest, MessagingApi
 from linebot.models import TextSendMessage
 
@@ -76,8 +79,7 @@ def check_level_lock(p, job_mod):
     p["level"] = p_level
     p["exp"] = p_exp
 
-    # ✨ 關鍵修復：升級成功後，即時計算最新等級與裝備加成下的最大 HP/MP 並全面補滿！
-    import equipment_core
+    # ✨ 關鍵修復：升級成功後，自動將血量與魔力充滿至最新上限！
     eq_bonus = equipment_core.get_player_total_equipment_bonus(p)
     vit_val = int((p.get("vitality", 10) + eq_bonus["vitality"]) * job_mod["vit_mod"])
     men_val = int((p.get("sprit", 10) + eq_bonus["sprit"]) * job_mod["men_mod"])
@@ -86,3 +88,4 @@ def check_level_lock(p, job_mod):
     p["mp"] = 50 + (men_val * 4) + (p["level"] * 5)
 
     return is_job_locked
+# === END OF FILE ===
