@@ -1,4 +1,4 @@
-# battle_core.py - 純粹戰鬥調度中心 v4.3 (尋怪與攻擊嚴格分離版)
+# battle_core.py - 純粹戰鬥調度中心 v4.3
 
 import random
 from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
@@ -13,7 +13,6 @@ import monsters
 import challenge_system
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【戰鬥主路由：尋怪與攻擊嚴格分離】"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA:
@@ -24,7 +23,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
     current_weapon = p.get("weapon", "赤手空拳")
     w_bonus = weapons.get_weapon_atk(current_weapon) + int(p.get("forge_weapon_bonus", 0))
 
-    # 1. 轉職卡關防呆
     if (p["level"] == 25 and job_mod["tier"] == 0) or (p["level"] == 50 and job_mod["tier"] == 1) or (p["level"] == 100 and job_mod["tier"] == 2):
         if user_msg in ("攻擊", "使用技能") or user_msg.startswith("使用技能"):
             job_notice = jobs.get_job_options_text(p)
@@ -35,9 +33,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 你已經陣亡了！請點擊底部【😇 祈求復活】按鈕。"))
         return
 
-    # 2. 🔍 尋找怪物處理（純粹遭遇怪物，絕對不主動揮出第一刀！）
     if user_msg in ("尋找怪物", "尋怪"):
-        if p[" enemy"] is not None and not p["enemy"].get("is_world_boss"):
+        if p["enemy"] is not None and not p["enemy"].get("is_world_boss"):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚔️ 眼前還有怪物！請發動【攻擊】或施放職業技能！"))
             return
 
@@ -62,7 +59,6 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
         return
 
-    # 若沒有怪卻點了攻擊，提示尋找怪物
     if p["enemy"] is None:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 目前周圍沒有怪物，請點擊底部【🔍 尋找怪物】來遭遇對手！"))
         return
