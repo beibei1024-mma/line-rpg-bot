@@ -1,4 +1,4 @@
-# game_core.py - 皇家分流主控台 v4.8 (完整黑市與逃跑優先版)
+# game_core.py - 皇家分流主控台 v4.9 (完整路由安全版)
 
 import random
 import datetime
