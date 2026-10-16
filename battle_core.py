@@ -1,4 +1,4 @@
-# battle_core.py - 純粹戰鬥調度中心 v4.3
+# battle_core.py - 純粹戰鬥調度中心 v4.4 (完美字串與世界Boss戰功版)
 
 import random
 from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
@@ -92,7 +92,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
 
         skill_dmg, skill_log = combat_engine.calculate_skill_attack(p, job_mod, eq_bonus, w_bonus, skill_name)
         total_p_dmg = skill_dmg
-        log += skill_log.format(enemy_name=enemy["name"])
+        log += skill_log
     else:
         atk_dmg, atk_log = combat_engine.calculate_player_attack(p, job_mod, eq_bonus, w_bonus)
         total_p_dmg = atk_dmg
@@ -102,7 +102,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
 
     if enemy.get("is_world_boss") and total_p_dmg > 0:
         p["world_boss_damage"] = (p.get("world_boss_damage", 0) or 0) + total_p_dmg
-        log += "🌋 【世界Boss討伐戰功】累計輸出：⚔️ " + str(p['world_boss_damage']) + " 點！\n"
+        log += "🌋 【世界Boss討伐戰功】個人累計輸出：" + str(p['world_boss_damage']) + " 點！\n"
 
     if enemy["hp"] <= 0:
         loot_log, is_job_locked = loot_engine.process_monster_defeat(p, enemy, configuration)
