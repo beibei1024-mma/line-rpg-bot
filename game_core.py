@@ -131,6 +131,9 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "更換裝備結果", card_data)
         return
     elif user_msg == "脫下裝備":
+        elif user_msg == "出售普通裝備":
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=bag.sell_common_equipment(p)))
+        return
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=forge_system.execute_unequip_weapon(p)))
         return
 
