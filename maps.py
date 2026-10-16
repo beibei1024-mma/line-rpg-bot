@@ -104,5 +104,5 @@ def change_map(p, target_map):
         p["enemy"] = monsters.generate_random_monster(target_map)
 
     db_core.save_player(p)
-    return f"✨ 🔮 傳送成功！時空法陣光芒收束，你已順利跨越時空抵達 ── 📍【{target_map}】！\n\n{info['desc']}\n\n⚔️ 警報！前方遭遇了守關強敵【{p['enemy']['name']}】，請發動攻擊！"
+    return f"✨ 🔮 傳送成功！時空法陣光芒收束,你已順利跨越時空抵達 ── 📍【{target_map}】！\n\n{info['desc']}\n\n⚔️ 警報！前方遭遇了守關強敵【{p['enemy']['name']}】，請發動攻擊！"
 # === END OF FILE ===
