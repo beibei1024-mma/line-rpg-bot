@@ -1,3 +1,5 @@
+# battle_core.py - 純粹戰鬥計算機 v3.2 (勝利自動回滿血魔版)
+
 import random
 from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
 from linebot.models import TextSendMessage
@@ -11,21 +13,24 @@ import notice_system
 import forge_system
 import challenge_system
 import skills_calculator
+import equipment_core
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【純粹戰鬥計算機 v3.1 技能樹解耦與世界Boss戰功完全體】"""
+    """【純粹戰鬥計算機 v3.2 技能樹解耦與世界Boss戰功完全體】"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA:
         current_job = "初心者"
     job_mod = jobs.JOBS_DATA[current_job]
 
-    base_str = p.get("strength", 10 + (level * 3))
-    base_agi = p.get("agility", 10 + (level * 2))
-    base_int = p.get("intelligence", 10 + (level * 2))
-    base_vit = p.get("vitality", 10 + (level * 3))
-    base_luk = p.get("luck", 10 + (level * 1))
-    base_men = p.get("sprit", 10 + (level * 2))
+    eq_bonus = equipment_core.get_player_total_equipment_bonus(p)
+
+    base_str = p.get("strength", 10 + (level * 3)) + eq_bonus["strength"]
+    base_agi = p.get("agility", 10 + (level * 2)) + eq_bonus["agility"]
+    base_int = p.get("intelligence", 10 + (level * 2)) + eq_bonus["intelligence"]
+    base_vit = p.get("vitality", 10 + (level * 3)) + eq_bonus["vitality"]
+    base_luk = p.get("luck", 10 + (level * 1)) + eq_bonus["luck"]
+    base_men = p.get("sprit", 10 + (level * 2)) + eq_bonus["sprit"]
 
     str_val = int(base_str * job_mod["str_mod"])
     agi_val = int(base_agi * job_mod["agi_mod"])
@@ -45,7 +50,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
     if (p["level"] == 25 and job_mod["tier"] == 0) or (p["level"] == 50 and job_mod["tier"] == 1) or (p["level"] == 100 and job_mod["tier"] == 2):
         if user_msg in ("攻擊", "使用技能") or user_msg.startswith("使用技能"):
             job_notice = jobs.get_job_options_text(p)
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔒 【天賦界限卡關中】請先完成手動天賦轉職！\n\n{job_notice}"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🔒 【天賦界限卡關中】請先完成手動天賦轉職！\n\n" + job_notice))
             return
 
     # 2. 🔍 尋找怪物處理
@@ -70,7 +75,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         p["enemy"] = random_monster
         db_core.save_player(p)
 
-        title_log = f"⚠️ 遭遇強敵！在📍【{current_location}】撞見了對手！\n\n📢 環境狀態：{random_monster['env']}\n🔰 怪物被動：{random_monster['skill']}"
+        title_log = "⚠️ 遭遇強敵！在📍【" + current_location + "】撞見了對手！\n\n📢 環境狀態：" + random_monster['env'] + "\n🔰 怪物被動：" + random_monster['skill']
         card_data = db_core.make_battle_card(title_log, p, random_monster)
         msg_payload = {"replyToken": event.reply_token, "messages": [{"type": "flex", "altText": "遭遇怪物", "contents": card_data["flex"], "quickReply": card_data["quick_reply"]}]}
         with ApiClient(configuration) as api_client:
@@ -87,7 +92,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             p_def = vit_val // 2
             backlash_dmg = max(1, (random.randint(1, enemy["atk"]) - p_def) * 2)
             p["hp"] = max(0, p["hp"] - backlash_dmg)
-            log = f"🏃 ❌ 逃跑失敗！你露出了巨大的破綻，遭到【{enemy['name']}】憤怒的背後致命重擊，受到雙倍傷害 -{backlash_dmg} 點！"
+            log = "🏃 ❌ 逃跑失敗！你露出了巨大的破綻，遭到【" + enemy['name'] + "】憤怒的背後致命重擊，受到雙倍傷害 -" + str(backlash_dmg) + " 點！"
             if p["hp"] <= 0:
                 p["enemy"] = None
                 log += "\n💀 你受傷過重在逃跑途中陣亡了！"
@@ -129,24 +134,24 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             log += "🛡️ 戰術防禦！你架起鋼鐵防護姿態，本回合防禦力暴增 3 倍，全神貫注準備抵擋目標的反擊！\n"
         elif is_skill:
             if skill_name not in job_mod["skills"]:
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"❌ 技能錯誤！你目前職業的天賦樹中不會【{skill_name}】法術。"))
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 技能錯誤！你目前職業的天賦樹中不會【" + skill_name + "】法術。"))
                 return
 
             mp_cost = job_mod["skills"][skill_name].get("mp_cost", 0)
             safe_mp = p.get("mp", calculated_max_mp)
             if safe_mp < mp_cost:
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔷 魔力枯竭！施放【{skill_name}】需要 {mp_cost} 點 MP，你目前只有 {safe_mp} 點！"))
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🔷 魔力枯竭！施放【" + skill_name + "】需要 " + str(mp_cost) + " 點 MP，你目前只有 " + str(safe_mp) + " 點！"))
                 return
 
             p["mp"] = safe_mp - mp_cost
-            log += f"🔮 奧義發動！你消耗了 🔷 {mp_cost} 點 MP 施放秘術 ── ⚡【{skill_name}】！\n"
+            log += "🔮 奧義發動！你消耗了 🔷 " + str(mp_cost) + " 點 MP 施放秘術 ── ⚡【" + skill_name + "】！\n"
 
             if skill_name in ("治癒術", "群體療癒", "淨化術", "復活預言"):
                 mult = 3.5 if skill_name in ("群體療癒", "復活預言") else 2.5
                 heal = int((int_val + men_val) * mult)
                 old_h = p["hp"]
                 p["hp"] = min(100 + (vit_val * 5) + (level * 15), p["hp"] + heal)
-                log += f"💖 聖光治癒！神聖恢復了生命值 +{p['hp'] - old_h} 點！\n"
+                log += "💖 聖光治癒！神聖恢復了生命值 +" + str(p['hp'] - old_h) + " 點！\n"
                 if skill_name in ("淨化術", "復活預言"):
                     p_defense_multiplier = 2.0
                     log += "✨ 聖光護體！本回合防禦力額外提升 2 倍！\n"
@@ -165,18 +170,18 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             d1 = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
             if random.random() < crit_chance:
                 d1 = int(d1 * crit_dmg_mod)
-                log += f"💥 致命爆擊！第 1 擊斬出 {d1} 點爆擊物理傷害！\n"
+                log += "💥 致命爆擊！第 1 擊斬出 " + str(d1) + " 點爆擊物理傷害！\n"
             else:
-                log += f"⚔️ 第 1 擊普通命中，造成 {d1} 點物理傷害！\n"
+                log += "⚔️ 第 1 擊普通命中，造成 " + str(d1) + " 點物理傷害！\n"
             total_p_dmg += d1
 
             if is_double:
                 d2 = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
                 if random.random() < crit_chance:
                     d2 = int(d2 * crit_dmg_mod)
-                    log += f"💥 致命爆擊！第 2 擊斬出 {d2} 點爆擊物理傷害！\n"
+                    log += "💥 致命爆擊！第 2 擊斬出 " + str(d2) + " 點爆擊物理傷害！\n"
                 else:
-                    log += f"⚔️ 第 2 擊普通命中，造成 {d2} 點物理傷害！\n"
+                    log += "⚔️ 第 2 擊普通命中，造成 " + str(d2) + " 點物理傷害！\n"
                 total_p_dmg += d2
 
         enemy["hp"] -= total_p_dmg
@@ -184,7 +189,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         # 🌋 世界 Boss 戰功即時累計
         if enemy.get("is_world_boss") and total_p_dmg > 0:
             p["world_boss_damage"] = (p.get("world_boss_damage", 0) or 0) + total_p_dmg
-            log += f"🌋 【世界Boss討伐戰功】累計輸出：⚔️ {p['world_boss_damage']} 點！\n"
+            log += "🌋 【世界Boss討伐戰功】累計輸出：⚔️ " + str(p['world_boss_damage']) + " 點！\n"
 
         # ── 5. 戰鬥大獲全勝結算 ──
         if enemy["hp"] <= 0:
@@ -198,8 +203,8 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             final_gold = int(random.randint(min_gold, max_gold) * gold_mod)
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
-            p["mp"] = min(calculated_max_mp, p["mp"] + 25)
-            log += f"🎉 順利擊敗對手！獲得金幣 +{final_gold}、經驗值 +{enemy['exp']}！\n🔷 戰鬥結束調息，魔力恢復 +25 點。\n"
+            
+            log += "🎉 順利擊敗對手！獲得金幣 +" + str(final_gold) + "、經驗值 +" + str(enemy['exp']) + "！\n🔷 戰鬥結束調息，魔力完全恢復！\n"
 
             if random.random() < 0.05:
                 current_loc = p.get("current_map", "新手村")
@@ -207,7 +212,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 if matched_weapons:
                     drop_w = random.choice(matched_weapons)
                     forge_system.add_to_weapon_inventory(p, drop_w)
-                    log += f"💎 🔥 🗺️ 【神裝降臨・直接入庫】 🗺️ 🔥 💎\n你擊敗魔物搜刮戰場，驚喜搜刮到了該區域的專屬神兵 ── ⚔️【{drop_w}】！\n📦 存放去向：寶物已為您送入【我的背包】裝備收藏庫，快去開包更換吧！\n"
+                    log += "💎 🔥 🗺️ 【神裝降臨・直接入庫】 🗺️ 🔥 💎\n你擊敗魔物搜刮戰場，驚喜搜刮到了該區域的專屬神兵 ── ⚔️【" + drop_w + "】！\n📦 存放去向：寶物已為您送入【我的背包】裝備收藏庫，快去開包更換吧！\n"
 
             raw_monster_name = enemy["name"]
             if "地獄紅蓮巨龍" in raw_monster_name or "邪神克蘇魯" in raw_monster_name or enemy.get("is_world_boss"):
@@ -217,18 +222,13 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             p["enemy"] = None
             if random.random() < 0.50 and enemy.get("drop_item"):
                 bag.add_to_inventory(p, enemy["drop_item"], is_material=True)
-                log += f"💎 【幸運掉寶】！素材：【{enemy['drop_item']}】x1！\n"
+                log += "💎 【幸運掉寶】！素材：【" + enemy['drop_item'] + "】x1！\n"
 
             is_job_locked = jobs_system.check_level_lock(p, job_mod)
             
-            # 戰鬥勝利結算：精確回滿血量與魔力（包含裝備體力與精神加成）
-            eq_bonus = equipment_core.get_player_total_equipment_bonus(p) if hasattr(equipment_core, "get_player_total_equipment_bonus") else {"vitality": 0, "sprit": 0}
-            vit_val = int((p.get("vitality", 10) + eq_bonus.get("vitality", 0)) * job_mod["vit_mod"])
-            men_val = int((p.get("sprit", 10) + eq_bonus.get("sprit", 0)) * job_mod["men_mod"])
-            
+            # ✨ 關鍵修復：戰鬥勝利結算時，血量與魔力同步完美充滿至最新上限！
             p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
-            max_mp_val = 50 + (men_val * 4) + (p["level"] * 5)
-            p["mp"] = min(max_mp_val, p.get("mp", max_mp_val) + 25)
+            p["mp"] = calculated_max_mp
             
             db_core.save_player(p)
 
@@ -243,7 +243,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 }]
             }
             if is_job_locked:
-                msg_payload["messages"].append({"type": "text", "text": f"🔒 【天賦界限卡關中】\n勇者！你目前已達到了 Lv.{p['level']} 的天賦瓶頸，必須完成天賦轉職才能繼續獲取經驗！\n\n{jobs.get_job_options_text(p)}"})
+                msg_payload["messages"].append({"type": "text", "text": "🔒 【天賦界限卡關中】\n勇者！你目前已達到了 Lv." + str(p['level']) + " 的天賦瓶頸，必須完成天賦轉職才能繼續獲取經驗！\n\n" + jobs.get_job_options_text(p)})
 
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
@@ -258,7 +258,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             p_def = int((vit_val // 2) * p_defense_multiplier)
             dmg_received = max(1, random.randint(1, enemy["atk"]) - p_def)
             p["hp"] = max(0, p["hp"] - dmg_received)
-            log += f"\n🩹 【{enemy['name']}】發動殘暴反擊！你受到 {dmg_received} 點物理傷害！"
+            log += "\n🩹 【" + enemy['name'] + "】發動殘暴反擊！你受到 " + str(dmg_received) + " 點物理傷害！"
 
             if p["hp"] <= 0:
                 p["enemy"] = None
@@ -293,3 +293,4 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
         }
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest.from_dict(msg_payload))
+# === END OF FILE ===
