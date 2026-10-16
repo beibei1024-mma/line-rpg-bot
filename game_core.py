@@ -1,4 +1,4 @@
-# game_core.py - 皇家分流主控台 v4.0 (防斷行與縮排完全對齊版)
+# game_core.py - 皇家分流主控台 v4.2 (安全完整版)
 
 import random
 import datetime
@@ -22,7 +22,7 @@ CITY_ONLY_COMMANDS = {
 
 
 def _reply_flex(configuration, reply_token, alt_text, card_data):
-    """統一安全發送 Flex Message + QuickReply，自動處理 v3 序列化"""
+    """統一安全發送 Flex Message + QuickReply"""
     qr = card_data.get("quick_reply")
     if hasattr(qr, "to_dict"):
         qr = qr.to_dict()
@@ -40,7 +40,6 @@ def _reply_flex(configuration, reply_token, alt_text, card_data):
 
 
 def process_game_logic(event, line_bot_api, configuration):
-    """【皇家分流主控台 坐標數據完全同步版】"""
     user_id = event.source.user_id
     raw_text = event.message.text
     user_msg = (
@@ -55,7 +54,7 @@ def process_game_logic(event, line_bot_api, configuration):
     current_loc = p.get("current_map", "主城")
     p["current_map"] = current_loc
 
-    # 🏙️ 快捷口令：回城 / 飛回城鎮
+    # 1. 回城
     if user_msg in ("回城", "飛回城鎮", "傳送主城"):
         p["current_map"] = "主城"
         p["enemy"] = None
@@ -68,32 +67,32 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "回城成功", card_data)
         return
 
-    # 😇 處理【復活】
-    elif user_msg in ("復活", "祈求復活"):
+    # 2. 復活
+    if user_msg in ("復活", "祈求復活"):
         card_data = player.handle_resurrect(p)
         _reply_flex(configuration, event.reply_token, "勇者復活歸來", card_data)
         return
 
-    # 👤 1. 處理【我的狀態】面板
-    elif user_msg in ("我的狀態", "狀態"):
+    # 3. 狀態
+    if user_msg in ("我的狀態", "狀態"):
         card_data = player.get_status_card(p)
         _reply_flex(configuration, event.reply_token, "我的狀態面板", card_data)
         return
 
-    # 🎒 2. 處理【我的背包】倉庫
-    elif user_msg in ("我的背包", "背包"):
+    # 4. 背包
+    if user_msg in ("我的背包", "背包"):
         card_data = bag.get_bag_card(p)
         _reply_flex(configuration, event.reply_token, "我的私人物品倉庫", card_data)
         return
 
-    # 🛡️ 3. 處理【我的裝備】裝備欄
-    elif user_msg in ("我的裝備", "裝備"):
+    # 5. 裝備欄
+    if user_msg in ("我的裝備", "裝備"):
         card_data = forge_system.get_equipment_card(p)
         _reply_flex(configuration, event.reply_token, "我的神聖裝備欄", card_data)
         return
 
-    # 👑 【自訂姓名管線】支援「取名 XXX」或「改名 XXX」格式
-    elif user_msg.startswith("取名") or user_msg.startswith("改名"):
+    # 6. 改名
+    if user_msg.startswith("取名") or user_msg.startswith("改名"):
         new_name = user_msg.replace("改名", "").replace("取名", "").strip()
         if len(new_name) < 2 or len(new_name) > 12:
             line_bot_api.reply_message(
@@ -116,8 +115,8 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "取名成功", card_data)
         return
 
-    # ✨ 【屬性配點】管線
-    elif user_msg.startswith("加點") or user_msg.startswith("配點"):
+    # 7. 加點
+    if user_msg.startswith("加點") or user_msg.startswith("配點"):
         clean_cmd = user_msg.replace("配點", "加點")
         attr_name = clean_cmd.replace("加點", "")[:2]
         pts_str = clean_cmd.replace("加點", "")[2:]
@@ -164,26 +163,28 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "屬性配點結果", card_data)
         return
 
-    # 🎭 【轉職】管線
-    elif user_msg.startswith("轉職"):
+    # 8. 轉職
+    if user_msg.startswith("轉職"):
         jobs_system.handle_job_transfer(event, line_bot_api, p, user_msg, configuration)
         return
 
-    # ⚔️ 【穿戴、脫下與出售裝備】管線
-    elif user_msg.startswith("裝備") or user_msg.startswith("穿上"):
+    # 9. 裝備穿戴
+    if user_msg.startswith("裝備") or user_msg.startswith("穿上"):
         res_text = bag.equip_weapon_from_bag(p, user_msg)
         card_data = db_core.make_battle_card(res_text, p, p["enemy"])
         _reply_flex(configuration, event.reply_token, "更換裝備結果", card_data)
         return
 
-    elif user_msg == "脫下裝備":
+    # 10. 卸下裝備
+    if user_msg == "脫下裝備":
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=forge_system.execute_unequip_weapon(p))
         )
         return
 
-    elif user_msg == "出售普通裝備":
+    # 11. 出售普通裝備
+    if user_msg == "出售普通裝備":
         if hasattr(bag, "sell_common_equipment"):
             reply_msg = bag.sell_common_equipment(p)
         else:
@@ -191,8 +192,8 @@ def process_game_logic(event, line_bot_api, configuration):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
         return
 
-    # 🧪 【喝藥水】管線（排除「使用技能」，讓玩家在戰鬥中也能喝藥水補血）
-    elif user_msg.startswith("使用") and not user_msg.startswith("使用技能"):
+    # 12. 喝藥水
+    if user_msg.startswith("使用") and not user_msg.startswith("使用技能"):
         potion_name = user_msg.replace("使用", "").strip()
         line_bot_api.reply_message(
             event.reply_token,
@@ -200,8 +201,8 @@ def process_game_logic(event, line_bot_api, configuration):
         )
         return
 
-    # 🗺️ 【世界地圖與傳送】管線
-    elif user_msg in ("世界地圖", "出城冒險"):
+    # 13. 世界地圖
+    if user_msg in ("世界地圖", "出城冒險"):
         if current_loc == "主城" and p["enemy"] is not None:
             p["enemy"] = None
             db_core.save_player(p)
@@ -211,21 +212,22 @@ def process_game_logic(event, line_bot_api, configuration):
         )
         return
 
-    elif user_msg.startswith("前往") or user_msg.startswith("傳送"):
+    # 14. 傳送
+    if user_msg.startswith("前往") or user_msg.startswith("傳送"):
         res_text = maps.change_map(p, user_msg)
         card_data = db_core.make_battle_card(res_text, p, p["enemy"])
         _reply_flex(configuration, event.reply_token, "時空傳送結果", card_data)
         return
 
-    # ⚔️ 處理世界 Boss 實體或野外獵怪戰鬥導流
+    # 15. 戰鬥中行動
     if p["enemy"] is not None:
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
         return
-    elif user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
+    if user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
         return
 
-    # 🔒 城市專屬鎖死功能安全隔離牆
+    # 16. 野外限制隔離牆
     is_city_cmd = any(user_msg.startswith(cmd) or user_msg == cmd for cmd in CITY_ONLY_COMMANDS)
     if is_city_cmd and current_loc != "主城":
         warn_text = (
@@ -236,7 +238,7 @@ def process_game_logic(event, line_bot_api, configuration):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=warn_text))
         return
 
-    # 🏙️ 處於主城安全區內的指令導流
+    # 17. 主城安全區指令導流
     if current_loc == "主城":
         if user_msg == "冒險商店":
             line_bot_api.reply_message(
@@ -245,7 +247,7 @@ def process_game_logic(event, line_bot_api, configuration):
             )
             return
 
-        elif user_msg.startswith("購買"):
+        if user_msg.startswith("購買"):
             item = user_msg.replace("購買", "").strip()
             line_bot_api.reply_message(
                 event.reply_token,
@@ -253,7 +255,7 @@ def process_game_logic(event, line_bot_api, configuration):
             )
             return
 
-        elif user_msg == "簽到":
+        if user_msg == "簽定" or user_msg == "簽到":
             reward_gold = random.randint(500, 2000)
             today_str = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")
             if p.get("last_sign_in") == today_str:
@@ -267,4 +269,55 @@ def process_game_logic(event, line_bot_api, configuration):
             bag.add_to_inventory(p, "高級生命藥水")
             bag.add_to_inventory(p, "高級生命藥水")
             db_core.save_player(p)
-            sign_text = f"📆 簽到成功！獲得金幣 +{
+            sign_text = f"📆 簽到成功！獲得金幣 +{reward_gold}、高級生命藥水 x2！"
+            card_data = db_core.make_battle_card(sign_text, p, None)
+            _reply_flex(configuration, event.reply_token, "簽到成功", card_data)
+            return
+
+        if user_msg in ("冒險挑戰", "挑戰"):
+            card_data = challenge_system.get_challenge_menu(p)
+            _reply_flex(configuration, event.reply_token, "挑戰場", card_data)
+            return
+
+        if user_msg == "挑戰爬塔":
+            res = challenge_system.execute_tower_climb(p)
+            _reply_flex(configuration, event.reply_token, "試煉戰況", res)
+            return
+
+        if user_msg in ("挑戰世界Boss", "世界Boss"):
+            res = challenge_system.execute_world_boss_raid(p)
+            if isinstance(res, str):
+                card_data = db_core.make_battle_card(res, p, p.get("enemy"))
+                _reply_flex(configuration, event.reply_token, "Boss戰報", card_data)
+            else:
+                _reply_flex(configuration, event.reply_token, "Boss戰報", res)
+            return
+
+        if user_msg in ("鍛造工坊", "鍛造", "工坊"):
+            card_data = forge_system.get_forge_menu(p)
+            if "flex" in card_data:
+                _reply_flex(configuration, event.reply_token, "鍛造工坊", card_data)
+            else:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    FlexSendMessage(alt_text="鍛造工坊", contents=card_data)
+                )
+            return
+
+        if user_msg.startswith("鍛造"):
+            res = forge_system.execute_forge_weapon(p, user_msg)
+            if isinstance(res, str):
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
+            else:
+                _reply_flex(configuration, event.reply_token, "工坊熔煉結果", res)
+            return
+
+        if user_msg in ("尋找怪物", "尋怪", "攻擊", "使用技能"):
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！")
+            )
+            return
+
+    battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
+# === END OF FILE ===
