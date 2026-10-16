@@ -1,4 +1,4 @@
-# battle_core.py - 純粹戰鬥計算機 v3.2 (勝利自動回滿血魔版)
+# battle_core.py - 純粹戰鬥計算機 v3.3 (完美擊殺與血魔雙滿結算版)
 
 import random
 from linebot.v3.messaging import ReplyMessageRequest, MessagingApi, ApiClient
@@ -16,7 +16,7 @@ import skills_calculator
 import equipment_core
 
 def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
-    """【純粹戰鬥計算機 v3.2 技能樹解耦與世界Boss戰功完全體】"""
+    """【純粹戰鬥計算機 v3.3】"""
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     if current_job not in jobs.JOBS_DATA:
@@ -191,7 +191,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             p["world_boss_damage"] = (p.get("world_boss_damage", 0) or 0) + total_p_dmg
             log += "🌋 【世界Boss討伐戰功】累計輸出：⚔️ " + str(p['world_boss_damage']) + " 點！\n"
 
-        # ── 5. 戰鬥大獲全勝結算 ──
+        # ── 5. 戰鬥大獲全勝結算（支援小怪與Boss血量歸零判定） ──
         if enemy["hp"] <= 0:
             gold_mod = p.get("map_gold_mod", 1.0)
             gold_data = enemy["gold_range"]
@@ -204,7 +204,7 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
             p["gold"] += final_gold
             p["exp"] += enemy["exp"]
             
-            log += "🎉 順利擊敗對手！獲得金幣 +" + str(final_gold) + "、經驗值 +" + str(enemy['exp']) + "！\n🔷 戰鬥結束調息，魔力完全恢復！\n"
+            log += "🎉 順利擊敗對手！獲得金幣 +" + str(final_gold) + "、經驗值 +" + str(enemy['exp']) + "！\n🔷 戰鬥結束調息，血量與魔力完全恢復！\n"
 
             if random.random() < 0.05:
                 current_loc = p.get("current_map", "新手村")
