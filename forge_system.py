@@ -163,4 +163,4 @@ def execute_unequip_weapon(p):
     p["weapon"] = "赤手空拳"
     p["forge_weapon_bonus"] = 0
     db_core.save_player(p)
-    return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器
+    return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器 ── ⚔️【{current_weapon}】安全解下！已完整存入您的武器背包欄！"
