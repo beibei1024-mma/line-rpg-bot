@@ -2,6 +2,7 @@ import json
 import random
 import db_core
 import weapons
+import equipment_core
 import equipment_system
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 
@@ -11,7 +12,7 @@ CONSUMABLES = {
 }
 
 def get_bag_card(p):
-    """🎒 生成網格化勇者私人物資倉庫卡片 (緊湊不堆疊素質展示版)"""
+    """🎒 生成網格化勇者私人物資倉庫卡片 (完整顯示防具詞綴素質 + 修復按鈕截斷版)"""
     if "inventory" not in p or not p["inventory"]:
         p["inventory"] = {"items": {}, "materials": {}}
     inv = p["inventory"]
@@ -34,41 +35,34 @@ def get_bag_card(p):
 
     contents = [
         {"type": "text", "text": "🎒 勇者皇家私人物資倉庫", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-        {"type": "text", "text": f"👤 目前手持武裝：【{p.get('weapon', '赤手空拳')}】", "size": "xs", "color": "#4CD964", "align": "center", "margin": "xs"},
+        {"type": "text", "text": f"👤 目前手持武裝：【{p.get('weapon', '赤手空拳')}】", "size": "xs", "color": "#4CD964", "align": "center", "margin": "xs", "wrap": True},
         {"type": "separator", "margin": "md", "color": "#333333"}
     ]
 
     # 1. ⚔️ 【 裝備與兵器收藏庫 】
-    contents.append({"type": "text", "text": "⚔️ 【 裝備與兵器收藏庫 】", "weight": "bold", "size": "sm", "color": "#007AFF", "margin": "md"})
+    contents.append({"type": "text", "text": f"⚔️ 【 裝備與兵器收藏庫 】({len(w_list)}件)", "weight": "bold", "size": "sm", "color": "#007AFF", "margin": "md"})
     if not w_list:
         contents.append({"type": "text", "text": "   (您的裝備背包空空如也，快去商店或野外打寶！)", "size": "xs", "color": "#8E8E93"})
     else:
         for item in w_list:
             eq_name = item.get("name", "未知裝備")
-            pure_w_name = weapons.get_pure_weapon_name(eq_name)
-
-            if pure_w_name in weapons.SHOP_WEAPONS and pure_w_name != "赤手空拳":
-                atk_val = weapons.get_weapon_atk(eq_name)
-                stat_text = f"💥 攻擊力 +{atk_val}"
-            elif "atk" in item and item.get("atk", 0) > 0:
-                stat_text = f"💥 攻擊力 +{item['atk']} | 🛡️ 防禦 +{item.get('def', 0)}"
-            else:
-                detected_slot = item.get("slot") or equipment_system.get_equipment_slot_by_name(eq_name) or "防具"
-                stat_text = f"🛡️ 部位：{detected_slot}"
+            detected_slot = item.get("slot") or equipment_system.get_equipment_slot_by_name(eq_name) or "防具"
+            parsed = equipment_core.parse_equipment_stats(eq_name)
+            stat_text = f"[{detected_slot}] {parsed['summary']}"
 
             contents.append({
-                "type": "box", "layout": "horizontal", "margin": "xs", "backgroundColor": "#2C2C2E", "paddingAll": "xs", "cornerRadius": "sm", "alignItems": "center",
+                "type": "box", "layout": "horizontal", "margin": "xs", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "sm", "alignItems": "center", "spacing": "sm",
                 "contents": [
                     {
-                        "type": "box", "layout": "vertical", "flex": 4,
+                        "type": "box", "layout": "vertical", "flex": 5,
                         "contents": [
-                            {"type": "text", "text": f"🔸 {eq_name}", "size": "xs", "color": "#FFFFFF", "weight": "bold"},
-                            {"type": "text", "text": stat_text, "size": "xxs", "color": "#FF9500", "marginTop": "xs"}
+                            {"type": "text", "text": f"🔸 {eq_name}", "size": "xs", "color": "#FFFFFF", "weight": "bold", "wrap": True},
+                            {"type": "text", "text": stat_text, "size": "xxs", "color": "#FF9500", "marginTop": "xs", "wrap": True}
                         ]
                     },
                     {
                         "type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "flex": 2,
-                        "action": {"type": "message", "label": "⚡ 穿戴", "text": f"裝備 {eq_name}"}
+                        "action": {"type": "message", "label": "穿戴", "text": f"裝備 {eq_name}"}
                     }
                 ]
             })
@@ -83,9 +77,9 @@ def get_bag_card(p):
                 contents.append({
                     "type": "box", "layout": "horizontal", "margin": "xs", "alignItems": "center",
                     "contents": [
-                        {"type": "text", "text": f"🔹 {name} (x{count})", "size": "xs", "color": "#E0E0E0", "flex": 4},
+                        {"type": "text", "text": f"🔹 {name} (x{count})", "size": "xs", "color": "#E0E0E0", "flex": 5},
                         {"type": "button", "style": "primary", "color": "#34AADC", "height": "sm", "flex": 2,
-                         "action": {"type": "message", "label": "🧪 飲用", "text": f"使用 {name}"}}
+                         "action": {"type": "message", "label": "飲用", "text": f"使用 {name}"}}
                     ]
                 })
 
@@ -106,6 +100,7 @@ def get_bag_card(p):
 
     flex_bubble = {
         "type": "bubble",
+        "size": "mega",
         "styles": {"body": {"backgroundColor": "#1A1A1A"}},
         "body": {"type": "box", "layout": "vertical", "spacing": "xs", "contents": contents}
     }
@@ -113,17 +108,46 @@ def get_bag_card(p):
     quick_items = [
         QuickReplyItem(action=MessageAction(label="👤 我的狀態", text="我的狀態")),
         QuickReplyItem(action=MessageAction(label="🛡️ 我的裝備", text="我的裝備")),
+        QuickReplyItem(action=MessageAction(label="💰 一鍵賣普通裝", text="出售普通裝備")),
         QuickReplyItem(action=MessageAction(label="🏪 補給商店", text="冒險商店")),
         QuickReplyItem(action=MessageAction(label="🦅 返回城鎮", text="回城"))
     ]
     return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items).to_dict()}
 
+def sell_common_equipment(p):
+    """💰 一鍵清理背包中的普通與新手淘汰裝備換取金幣"""
+    w_inv_str = p.get("weapon_inventory", "[]")
+    if w_inv_str in (None, "None", "", "{}"):
+        w_inv_str = "[]"
+    try:
+        w_list = json.loads(w_inv_str) if isinstance(w_inv_str, str) else list(w_inv_str)
+    except Exception:
+        w_list = []
+
+    kept = []
+    sold_count = 0
+    total_gold = 0
+    for item in w_list:
+        eq_name = item.get("name", "")
+        if "⭐普通" in eq_name or eq_name.startswith("冒險者"):
+            st = equipment_core.parse_equipment_stats(eq_name)
+            total_gold += st.get("price", 30)
+            sold_count += 1
+        else:
+            kept.append(item)
+
+    if sold_count == 0:
+        return "💡 您的背包中目前沒有【⭐普通】或【冒險者新手裝】可供批量出售！"
+
+    p["gold"] += total_gold
+    p["weapon_inventory"] = json.dumps(kept, ensure_ascii=False)
+    db_core.save_player(p)
+    return f"💰 ✨ 【 批量出售成功 】 ✨ 💰\n─────────────────\n已將背包中 {sold_count} 件淘汰的普通/新手裝備回收給公會鐵匠！\n🪙 獲得回收金幣：+{total_gold} 金幣！"
+
 def equip_weapon_from_bag(p, user_cmd):
-    """⚔️ 換裝管線：全自動轉接至獨立的 equipment_system 非堆疊換裝核心"""
     return equipment_system.execute_equip_item(p, user_cmd)
 
 def add_to_inventory(p, item_name, is_material=False):
-    """🧪 常規堆疊物品入庫大腦"""
     if "inventory" not in p or not p["inventory"]:
         p["inventory"] = {"items": {}, "materials": {}}
     inv = p["inventory"]
@@ -139,7 +163,6 @@ def add_to_inventory(p, item_name, is_material=False):
     p["inventory"] = inv
 
 def use_potion(p, potion_name):
-    """🧪 喝藥水補血大腦"""
     if "inventory" not in p or not p["inventory"]:
         return "❌ 背包空無一物！"
     inv = p["inventory"]
@@ -156,7 +179,8 @@ def use_potion(p, potion_name):
     level = p.get("level", 1)
     current_job = p.get("job", "初心者")
     job_mod = jobs.JOBS_DATA.get(current_job, jobs.JOBS_DATA["初心者"])
-    vit_val = int(p.get("vitality", 10) * job_mod["vit_mod"])
+    eq_bonus = equipment_core.get_player_total_equipment_bonus(p)
+    vit_val = int((p.get("vitality", 10) + eq_bonus["vitality"]) * job_mod["vit_mod"])
     max_hp = 100 + (vit_val * 5) + (level * 15)
 
     if p["hp"] <= 0:
