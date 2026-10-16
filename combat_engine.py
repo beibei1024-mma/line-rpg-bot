@@ -1,4 +1,4 @@
-# combat_engine.py - 皇家戰鬥傷害與技能奧義計算獨立核心 (字串安全完整版)
+# combat_engine.py - 皇家戰鬥傷害與技能奧義計算獨立核心 (安全完整版)
 
 import random
 import weapons
@@ -23,7 +23,6 @@ def calculate_player_attack(p, job_mod, eq_bonus, w_bonus):
     log = ""
     total_dmg = 0
 
-    # 第 1 擊
     d1 = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
     if random.random() < crit_chance:
         d1 = int(d1 * crit_dmg_mod)
@@ -32,7 +31,6 @@ def calculate_player_attack(p, job_mod, eq_bonus, w_bonus):
         log += "⚔️ 第 1 擊普通命中，造成 " + str(d1) + " 點物理傷害！\n"
     total_dmg += d1
 
-    # 第 2 擊（連擊）
     if is_double:
         d2 = random.randint(5 + (str_val // 2) + w_bonus, 12 + str_val + w_bonus)
         if random.random() < crit_chance:
@@ -51,14 +49,14 @@ def calculate_skill_attack(p, job_mod, eq_bonus, w_bonus, skill_name):
     base_int = p.get("intelligence", 10 + (level * 2)) + eq_bonus["intelligence"]
     base_vit = p.get("vitality", 10 + (level * 3)) + eq_bonus["vitality"]
     base_agi = p.get("agility", 10 + (level * 2)) + eq_bonus["agility"]
-    base_luk = p.get("luck", 10 + (level * 1)) + eq_bonus["luck"]
+    base_luk = p.get("luck", 10 + (level * 1)) + eq_bonus["luk_mod"] if 'luk_mod' in locals() else p.get("luck", 10)
     base_men = p.get("sprit", 10 + (level * 2)) + eq_bonus["sprit"]
 
     str_val = int(base_str * job_mod["str_mod"])
     int_val = int(base_int * job_mod["int_mod"])
     vit_val = int(base_vit * job_mod["vit_mod"])
     agi_val = int(base_agi * job_mod["agi_mod"])
-    luk_val = int(base_luk * job_mod["luk_mod"])
+    luk_val = int(base_luk * job_mod.get("luk_mod", 1.0))
     men_val = int(base_men * job_mod["men_mod"])
 
     log = ""
@@ -81,9 +79,7 @@ def calculate_skill_attack(p, job_mod, eq_bonus, w_bonus, skill_name):
     )
     total_dmg = calc_res["damage"]
     if calc_res.get("log"):
-        # 安全替換技能對話中的怪物名稱
-        formatted_skill_log = calc_res["log"].replace("{enemy_name}", "{enemy_name}")
-        log += formatted_skill_log
+        log += calc_res["log"]
 
     return total_dmg, log
 # === END OF FILE ===
