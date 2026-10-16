@@ -1,10 +1,11 @@
-# forge_system.py - 皇家禁忌工坊與隨機熔煉核心大腦 v5.6 (完整相容防爆版)
+# forge_system.py - 皇家禁忌工坊與全身14欄位神聖裝備面板 v6.0
 
 import json
 import random
 from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
 import db_core
 import weapons
+import equipment_core
 import equipment_system
 
 FORGE_RECIPES = {
@@ -15,11 +16,9 @@ FORGE_RECIPES = {
 }
 
 def add_to_weapon_inventory(p, item_name):
-    """⚡ 相容轉接器：供 shop.py 與 battle_core.py 直接呼叫"""
     equipment_system.add_to_weapon_inventory_individual(p, item_name, slot_name="武器")
 
 def get_forge_menu(p):
-    """🛠️ 生成工坊手工鍛造藍圖 Flex 展售選單（回傳標準 flex + quick_reply 結構）"""
     contents = [
         {"type": "text", "text": "⚒️ 皇家遠古鍛造熔煉工坊", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
         {"type": "text", "text": f"🪙 勇者流動金幣：🪙 {p['gold']} 金幣", "size": "xs", "color": "#FFCC00", "align": "center", "margin": "xs"},
@@ -51,9 +50,7 @@ def get_forge_menu(p):
     return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items).to_dict()}
 
 def execute_forge_weapon(p, cmd_str):
-    """⚒️ 核心熔煉大腦：洗鍊高品質裝備，並以【完全不堆疊】的獨立個體塞入新包包"""
     blueprint = cmd_str.replace("鍛造", "").replace(" ", "").strip()
-
     if blueprint not in FORGE_RECIPES or blueprint not in weapons.SHOP_WEAPONS:
         return "❌ 打造失敗！遠古工坊中沒有記載該裝備的神聖圖紙配方。"
 
@@ -72,7 +69,6 @@ def execute_forge_weapon(p, cmd_str):
 
     materials_dict = inv.get("materials", {})
     current_mat_qty = materials_dict.get(recipe["mat"], 0)
-
     if current_mat_qty < recipe["mat_qty"]:
         return f"❌ 打造失敗！🛠️ 鍛造素材不足！你需要【{recipe['mat']}】x{recipe['mat_qty']}，但你目前只有 {current_mat_qty} 個。"
 
@@ -105,51 +101,60 @@ def execute_forge_weapon(p, cmd_str):
     )
 
 def get_equipment_card(p):
-    """🛡️ 生成勇者神聖裝備欄面板，直連當前穿戴武器屬性"""
-    current_weapon = p.get("weapon", "赤手空拳")
-    pure_w_name = weapons.get_pure_weapon_name(current_weapon)
-    w_info = weapons.SHOP_WEAPONS.get(pure_w_name, {"atk_bonus": 0, "desc": "赤手空拳，毫無攻擊力加成。"})
-    forge_bonus = int(p.get("forge_weapon_bonus", 0))
-    total_atk = weapons.get_weapon_atk(current_weapon) + forge_bonus
-
-    slot_contents = [
-        {"type": "text", "text": "⚔️ 主手武器 (Main-Hand Weapon)", "size": "xs", "color": "#007AFF", "weight": "bold"},
-        {"type": "text", "text": f"【 {current_weapon} 】", "size": "md", "color": "#4CD964", "weight": "bold", "marginTop": "xs"},
-        {"type": "text", "text": f"💥 實體物理傷害總增幅：+{total_atk} 點", "size": "xs", "color": "#FF9500", "margin": "xs"}
-    ]
-    if forge_bonus > 0:
-        slot_contents.append({"type": "text", "text": f"   ↳ (其中內含工坊神匠覺醒：+{forge_bonus} 點)", "size": "xs", "color": "#FFCC00"})
-    slot_contents.append({"type": "text", "text": f"📖 兵器神話：{w_info['desc']}", "size": "xs", "color": "#8E8E93", "margin": "xs", "wrap": True})
+    """🛡️ 生成全身 14 欄位神聖裝備欄面板，並統計全身總增幅"""
+    eq_totals = equipment_core.get_player_total_equipment_bonus(p)
 
     contents = [
-        {"type": "text", "text": "🛡️ 勇者神聖裝備欄面板", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-        {"type": "separator", "margin": "sm", "color": "#333333"},
-        {
-            "type": "box", "layout": "vertical", "margin": "md", "backgroundColor": "#2C2C2E", "paddingAll": "sm", "cornerRadius": "md",
-            "contents": slot_contents
-        }
+        {"type": "text", "text": "🛡️ 勇者全身神聖裝備面板", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
+        {"type": "text", "text": f"💥總物傷+{eq_totals['atk']} | 🧱總物防+{eq_totals['def']} | 🌀總魔防+{eq_totals['mdef']}", "size": "xxs", "color": "#FF9500", "align": "center", "margin": "xs"},
+        {"type": "separator", "margin": "sm", "color": "#333333"}
     ]
+
+    display_slots = [
+        ("⚔️ 武器", "weapon"), ("🪖 頭盔", "helmet"), ("🥋 上衣", "armor"),
+        ("👖 下褲", "pants"), ("👢 鞋子", "shoes"), ("📿 項鍊", "necklace"),
+        ("💍 戒指1", "ring1"), ("💍 戒指2", "ring2"), ("⌚ 手環", "bracelet"),
+        ("🛡️ 副手", "sub_hand"), ("🎖️ 徽章", "badge")
+    ]
+
+    for label, field in display_slots:
+        eq_name = p.get(field, "無")
+        if not eq_name or eq_name in ("無", "赤手空拳"):
+            eq_display = "赤手空拳" if field == "weapon" else "（未穿戴）"
+            color = "#8E8E93"
+            stat_str = ""
+        else:
+            eq_display = eq_name
+            color = "#4CD964"
+            st = equipment_core.parse_equipment_stats(eq_name)
+            stat_str = f" ({st['summary']})"
+
+        contents.append({
+            "type": "box", "layout": "horizontal", "margin": "xs", "backgroundColor": "#2C2C2E", "paddingAll": "xs", "cornerRadius": "sm",
+            "contents": [
+                {"type": "text", "text": label, "size": "xs", "color": "#007AFF", "weight": "bold", "flex": 2},
+                {"type": "text", "text": f"{eq_display}{stat_str}", "size": "xs", "color": color, "flex": 5, "wrap": True}
+            ]
+        })
+
+    if p.get("weapon", "赤手空拳") != "赤手空拳":
+        contents.append({
+            "type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "marginTop": "md",
+            "action": {"type": "message", "label": "❌ 卸下主手武器放回背包", "text": "脫下裝備"}
+        })
 
     quick_items = [
         QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")),
+        QuickReplyItem(action=MessageAction(label="👤 我的狀態", text="我的狀態")),
         QuickReplyItem(action=MessageAction(label="⚒️ 鍛造工坊", text="工坊")),
-        QuickReplyItem(action=MessageAction(label="🏃 返回世界尋怪", text="尋怪"))
+        QuickReplyItem(action=MessageAction(label="🦅 返回主城", text="回城"))
     ]
-    qr_dict = QuickReply(items=quick_items).to_dict()
-
-    if current_weapon != "赤手空拳":
-        contents.append({
-            "type": "button", "style": "primary", "color": "#FF3B30", "height": "sm", "marginTop": "sm",
-            "action": {"type": "message", "label": "❌ 卸下裝備放回背包", "text": "脫下裝備"}
-        })
-
     return {
-        "flex": {"type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}},
-        "quick_reply": qr_dict
+        "flex": {"type": "bubble", "size": "mega", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}},
+        "quick_reply": QuickReply(items=quick_items).to_dict()
     }
 
 def execute_unequip_weapon(p):
-    """卸下當前主手裝備放回備用收藏庫"""
     current_weapon = p.get("weapon", "赤手空拳")
     if current_weapon == "赤手空拳":
         return "❌ 脫除失敗！你目前本來就赤手空拳。"
@@ -158,5 +163,4 @@ def execute_unequip_weapon(p):
     p["weapon"] = "赤手空拳"
     p["forge_weapon_bonus"] = 0
     db_core.save_player(p)
-
-    return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器 ── ⚔️【{current_weapon}】安全解下！已完整存入您的武器背包欄！"
+    return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器
