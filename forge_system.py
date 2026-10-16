@@ -1,4 +1,4 @@
-# forge_system.py - 皇家禁忌工坊與全身14欄位神聖裝備面板 v6.0
+# forge_system.py - 皇家禁忌工坊與全身14欄位神聖裝備面板 v6.1 (防斷行安全版)
 
 import json
 import random
@@ -35,12 +35,18 @@ def get_forge_menu(p):
                     {"type": "text", "text": f"💰 打造消耗：🪙 {w_info['price']} 金幣", "size": "xxs", "color": "#FFCC00", "margin": "xs"},
                     {"type": "text", "text": f"🛡️ 所需材料：🛠️ {r['mat']} x{r['mat_qty']}", "size": "xxs", "color": "#34AADC"},
                     {"type": "text", "text": f"📖 描述：{w_info['desc']}", "size": "xxs", "color": "#8E8E93", "margin": "xs"},
-                    {"type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "marginTop": "xs",
-                     "action": {"type": "message", "label": "⚒️ 投入素材開始熔煉", "text": f"鍛造 {name}"}}
+                    {
+                        "type": "button", "style": "primary", "color": "#FF9500", "height": "sm", "marginTop": "xs",
+                        "action": {"type": "message", "label": "⚒️ 投入素材開始熔煉", "text": f"鍛造 {name}"}
+                    }
                 ]
             })
 
-    flex_bubble = {"type": "bubble", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}}
+    flex_bubble = {
+        "type": "bubble",
+        "styles": {"body": {"backgroundColor": "#1A1A1A"}},
+        "body": {"type": "box", "layout": "vertical", "contents": contents}
+    }
     quick_items = [
         QuickReplyItem(action=MessageAction(label="🎒 我的背包", text="我的背包")),
         QuickReplyItem(action=MessageAction(label="🛡️ 我的裝備", text="我的裝備")),
@@ -58,7 +64,10 @@ def execute_forge_weapon(p, cmd_str):
     w_config = weapons.SHOP_WEAPONS[blueprint]
 
     if p["gold"] < w_config["price"]:
-        return f"❌ 打造失敗！🪙 資金不足！打造【{blueprint}】需要 {w_config['price']} 金幣，你目前只有 {p['gold']} 金幣。"
+        return (
+            f"❌ 打造失敗！🪙 資金不足！\n"
+            f"打造【{blueprint}】需要 {w_config['price']} 金幣，你目前只有 {p['gold']} 金幣。"
+        )
 
     inv = p.get("inventory", {})
     if isinstance(inv, str):
@@ -70,7 +79,10 @@ def execute_forge_weapon(p, cmd_str):
     materials_dict = inv.get("materials", {})
     current_mat_qty = materials_dict.get(recipe["mat"], 0)
     if current_mat_qty < recipe["mat_qty"]:
-        return f"❌ 打造失敗！🛠️ 鍛造素材不足！你需要【{recipe['mat']}】x{recipe['mat_qty']}，但你目前只有 {current_mat_qty} 個。"
+        return (
+            f"❌ 打造失敗！🛠️ 鍛造素材不足！\n"
+            f"你需要【{recipe['mat']}】x{recipe['mat_qty']}，但你目前只有 {current_mat_qty} 個。"
+        )
 
     p["gold"] -= w_config["price"]
     materials_dict[recipe["mat"]] = current_mat_qty - recipe["mat_qty"]
@@ -91,22 +103,23 @@ def execute_forge_weapon(p, cmd_str):
     db_core.save_player(p)
 
     return (
-        f"⚒️ 🔥 【 工坊熔煉天啟大成功 】 🔥 ⚒️\n"
-        f"───────────────────\n"
-        f"鐵匠揮舞重錘，熔岩鐵水四濺！你投入的素材在法陣中完美凝聚！\n\n"
+        "⚒️ 🔥 【 工坊熔煉天啟大成功 】 🔥 ⚒️\n"
+        "───────────────────\n"
+        "鐵匠揮舞重錘，熔岩鐵水四濺！你投入的素材在法陣中完美凝聚！\n\n"
         f"🔨 成功打造：{final_eq_name} ({recipe['slot']})！\n"
         f"💥 武器品質物傷：+{actual_atk}\n"
         f"✨ 品質天啟：成功洗鍊出 ── 【{rolled_rarity}】階級！\n"
-        f"📦 存放去向：神兵利器已全自動以【獨立個體】送入【我的背包】，請開啟背包手動穿戴上身！"
+        "📦 存放去向：神兵利器已全自動以【獨立個體】送入【我的背包】，請開啟背包手動穿戴上身！"
     )
 
 def get_equipment_card(p):
     """🛡️ 生成全身 14 欄位神聖裝備欄面板，並統計全身總增幅"""
     eq_totals = equipment_core.get_player_total_equipment_bonus(p)
+    summary_header = f"💥總物傷+{eq_totals['atk']} | 🧱總物防+{eq_totals['def']} | 🌀總魔防+{eq_totals['mdef']}"
 
     contents = [
         {"type": "text", "text": "🛡️ 勇者全身神聖裝備面板", "weight": "bold", "size": "md", "color": "#FFFFFF", "align": "center"},
-        {"type": "text", "text": f"💥總物傷+{eq_totals['atk']} | 🧱總物防+{eq_totals['def']} | 🌀總魔防+{eq_totals['mdef']}", "size": "xxs", "color": "#FF9500", "align": "center", "margin": "xs"},
+        {"type": "text", "text": summary_header, "size": "xxs", "color": "#FF9500", "align": "center", "margin": "xs"},
         {"type": "separator", "margin": "sm", "color": "#333333"}
     ]
 
@@ -149,10 +162,13 @@ def get_equipment_card(p):
         QuickReplyItem(action=MessageAction(label="⚒️ 鍛造工坊", text="工坊")),
         QuickReplyItem(action=MessageAction(label="🦅 返回主城", text="回城"))
     ]
-    return {
-        "flex": {"type": "bubble", "size": "mega", "styles": {"body": {"backgroundColor": "#1A1A1A"}}, "body": {"type": "box", "layout": "vertical", "contents": contents}},
-        "quick_reply": QuickReply(items=quick_items).to_dict()
+    flex_bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "styles": {"body": {"backgroundColor": "#1A1A1A"}},
+        "body": {"type": "box", "layout": "vertical", "contents": contents}
     }
+    return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items).to_dict()}
 
 def execute_unequip_weapon(p):
     current_weapon = p.get("weapon", "赤手空拳")
@@ -163,4 +179,10 @@ def execute_unequip_weapon(p):
     p["weapon"] = "赤手空拳"
     p["forge_weapon_bonus"] = 0
     db_core.save_player(p)
-    return f"❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n─────────────────\n你成功將手持的神兵利器 ── ⚔️【{current_weapon}】安全解下！已完整存入您的武器背包欄！"
+    return (
+        "❌ 🛡️ 【裝備卸下成功】放回背包 ❌\n"
+        "─────────────────\n"
+        f"你成功將手持的神兵利器 ── ⚔️【{current_weapon}】安全解下！\n"
+        "已完整存入您的武器背包欄！"
+    )
+# === END OF FILE ===
