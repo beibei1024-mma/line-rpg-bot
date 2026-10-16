@@ -14,7 +14,7 @@ CONSUMABLES = {
 }
 
 def get_bag_card(p):
-    """🎒 生成網格化勇者私人物資倉庫卡片 (支援一鍵販賣普通裝備)"""
+    """🎒 生成網格化勇者私人物資倉庫卡片"""
     if "inventory" not in p or not p["inventory"]:
         p["inventory"] = {"items": {}, "materials": {}}
     inv = p["inventory"]
@@ -41,7 +41,6 @@ def get_bag_card(p):
         {"type": "separator", "margin": "md", "color": "#333333"}
     ]
 
-    # 1. ⚔️ 【 裝備與兵器收藏庫 】
     contents.append({"type": "text", "text": "⚔️ 【 裝備與兵器收藏庫 】(" + str(len(w_list)) + "件)", "weight": "bold", "size": "sm", "color": "#007AFF", "margin": "md"})
     if not w_list:
         contents.append({"type": "text", "text": "   (您的裝備背包空空如也，快去商店或野外打寶！)", "size": "xs", "color": "#8E8E93"})
@@ -69,7 +68,6 @@ def get_bag_card(p):
                 ]
             })
 
-    # 2. 🧪 【 藥水與補給物資 】
     contents.append({"type": "text", "text": "🧪 【 藥水與補給物資 】", "weight": "bold", "size": "sm", "color": "#34AADC", "margin": "lg"})
     if not items:
         contents.append({"type": "text", "text": "   (消耗品倉庫目前空空如也)", "size": "xs", "color": "#8E8E93"})
@@ -85,7 +83,6 @@ def get_bag_card(p):
                     ]
                 })
 
-    # 3. 💎 【 怪物珍稀原料區 】
     contents.append({"type": "text", "text": "💎 【 怪物珍稀原料區 】", "weight": "bold", "size": "sm", "color": "#AF52DE", "margin": "md"})
     if not materials:
         contents.append({"type": "text", "text": "   (尚未搜刮到任何魔物原料)", "size": "xs", "color": "#8E8E93"})
@@ -111,13 +108,11 @@ def get_bag_card(p):
         QuickReplyItem(action=MessageAction(label="👤 狀態", text="我的狀態")),
         QuickReplyItem(action=MessageAction(label="🛡️ 裝備", text="我的裝備")),
         QuickReplyItem(action=MessageAction(label="💰 賣普通裝", text="出售普通裝備")),
-        QuickReplyItem(action=MessageAction(label="🏪 商店", text="冒險商店")),
         QuickReplyItem(action=MessageAction(label="🦅 回城", text="回城"))
     ]
     return {"flex": flex_bubble, "quick_reply": QuickReply(items=quick_items).to_dict()}
 
 def sell_common_equipment(p):
-    """💰 一鍵回收背包中【⭐普通】與新手裝備換取金幣"""
     w_inv_str = p.get("weapon_inventory", "[]")
     if w_inv_str in (None, "None", "", "{}"):
         w_inv_str = "[]"
