@@ -1,4 +1,4 @@
-# game_core.py - 皇家分流主控台 v4.5 (黑市與安全區路由優先版)
+# game_core.py - 皇家分流主控台 v4.6 (支援單一與全部脫裝路由)
 
 import random
 import datetime
@@ -175,12 +175,11 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "更換裝備結果", card_data)
         return
 
-    # 10. 卸下裝備
-    if user_msg == "脫下裝備":
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=forge_system.execute_unequip_weapon(p))
-        )
+    # 10. 卸下裝備（支援「脫下 頭盔」、「全部脫下」等指令）
+    if user_msg.startswith("脫下") or user_msg.startswith("卸下") or user_msg == "全部脫下":
+        res_text = forge_system.execute_unequip_item(p, user_msg)
+        card_data = db_core.make_battle_card(res_text, p, p["enemy"])
+        _reply_flex(configuration, event.reply_token, "解除裝備結果", card_data)
         return
 
     # 11. 出售普通裝備（一鍵回收）
