@@ -220,7 +220,16 @@ def process_battle_logic(event, line_bot_api, p, user_msg, configuration):
                 log += f"💎 【幸運掉寶】！素材：【{enemy['drop_item']}】x1！\n"
 
             is_job_locked = jobs_system.check_level_lock(p, job_mod)
+            
+            # 戰鬥勝利結算：精確回滿血量與魔力（包含裝備體力與精神加成）
+            eq_bonus = equipment_core.get_player_total_equipment_bonus(p) if hasattr(equipment_core, "get_player_total_equipment_bonus") else {"vitality": 0, "sprit": 0}
+            vit_val = int((p.get("vitality", 10) + eq_bonus.get("vitality", 0)) * job_mod["vit_mod"])
+            men_val = int((p.get("sprit", 10) + eq_bonus.get("sprit", 0)) * job_mod["men_mod"])
+            
             p["hp"] = 100 + (vit_val * 5) + (p["level"] * 15)
+            max_mp_val = 50 + (men_val * 4) + (p["level"] * 5)
+            p["mp"] = min(max_mp_val, p.get("mp", max_mp_val) + 25)
+            
             db_core.save_player(p)
 
             card_data = db_core.make_battle_card(log, p, None)
