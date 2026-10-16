@@ -1,4 +1,4 @@
-# game_core.py - 皇家分流主控台 v4.2 (安全完整版)
+# game_core.py - 皇家分流主控台 v4.4 (完美路由與防呆版)
 
 import random
 import datetime
@@ -107,8 +107,8 @@ def process_game_logic(event, line_bot_api, configuration):
             "📜 ✨ 【 勇者本名登錄成功 】 ✨ 📜\n"
             "─────────────────\n"
             "冒險者公會羊皮紙上的魔法契約已更新！\n\n"
-            f"👤 舊有名號：{old_name}\n"
-            f"🔥 榮耀新名：【 {new_name} 】\n\n"
+            "👤 舊有名號：" + old_name + "\n"
+            "🔥 榮耀新名：【 " + new_name + " 】\n\n"
             "📈 威名遠播：您在世界頻道、全服戰功排行榜及狀態卡片上的尊稱已全數即時生效！"
         )
         card_data = db_core.make_battle_card(reply_log, p, p["enemy"])
@@ -133,7 +133,7 @@ def process_game_logic(event, line_bot_api, configuration):
         if pts_to_add <= 0 or free_pts < pts_to_add:
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text=f"❌ 潛能點數不足！你目前剩餘的自由潛能點只有 {free_pts} 點！")
+                TextSendMessage(text="❌ 潛能點數不足！你目前剩餘的自由潛能點只有 " + str(free_pts) + " 點！")
             )
             return
 
@@ -156,7 +156,7 @@ def process_game_logic(event, line_bot_api, configuration):
         reply_log = (
             "💪 【 屬性配點成功 】 💪\n"
             "─────────────────\n"
-            f"你引導了體內的遠古潛能，將 {pts_to_add} 點剩餘點數分配給了 ── ✨【 {attr_name} 】屬性！\n\n"
+            "你引導了體內的遠古潛能，將 " + str(pts_to_add) + " 點剩餘點數分配給了 ── ✨【 " + attr_name + " 】屬性！\n\n"
             "📈 能力激發：該屬性已實體在後台暴漲！輸入【我的狀態】即可查閱全新的數值面板！"
         )
         card_data = db_core.make_battle_card(reply_log, p, p["enemy"])
@@ -183,12 +183,9 @@ def process_game_logic(event, line_bot_api, configuration):
         )
         return
 
-    # 11. 出售普通裝備
+    # 11. 出售普通裝備（一鍵回收）
     if user_msg == "出售普通裝備":
-        if hasattr(bag, "sell_common_equipment"):
-            reply_msg = bag.sell_common_equipment(p)
-        else:
-            reply_msg = "💡 請先更新 bag.py 以啟用一鍵出售功能！"
+        reply_msg = bag.sell_common_equipment(p)
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
         return
 
@@ -231,7 +228,7 @@ def process_game_logic(event, line_bot_api, configuration):
     is_city_cmd = any(user_msg.startswith(cmd) or user_msg == cmd for cmd in CITY_ONLY_COMMANDS)
     if is_city_cmd and current_loc != "主城":
         warn_text = (
-            f"❌ 鎖定限制！你目前位於野外【{current_loc}】。\n"
+            "❌ 鎖定限制！你目前位於野外【" + current_loc + "】。\n"
             "野外無法開啟商店、簽到、工坊或發起爬塔！\n"
             "請先點擊小圖標【🦅 飛回城鎮】或輸入【回城】！"
         )
@@ -261,7 +258,7 @@ def process_game_logic(event, line_bot_api, configuration):
             if p.get("last_sign_in") == today_str:
                 line_bot_api.reply_message(
                     event.reply_token,
-                    TextSendMessage(text=f"❌ 勇者！你今天 ({today_str}) 已經簽到過了，明天再來吧！")
+                    TextSendMessage(text="❌ 勇者！你今天 (" + today_str + ") 已經簽到過了，明天再來吧！")
                 )
                 return
             p["gold"] += reward_gold
@@ -269,7 +266,7 @@ def process_game_logic(event, line_bot_api, configuration):
             bag.add_to_inventory(p, "高級生命藥水")
             bag.add_to_inventory(p, "高級生命藥水")
             db_core.save_player(p)
-            sign_text = f"📆 簽到成功！獲得金幣 +{reward_gold}、高級生命藥水 x2！"
+            sign_text = "📆 簽到成功！獲得金幣 +" + str(reward_gold) + "、高級生命藥水 x2！"
             card_data = db_core.make_battle_card(sign_text, p, None)
             _reply_flex(configuration, event.reply_token, "簽到成功", card_data)
             return
