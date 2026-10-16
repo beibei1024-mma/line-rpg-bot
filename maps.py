@@ -1,4 +1,7 @@
+# maps.py - 世界傳送廊與副本自動索敵專屬機制 (坐標與副本魔王完全同步版)
+
 import db_core
+import monsters
 
 MAPS_DATA = {
     "主城": {"level_req": 1, "desc": "🏙️ 皇家安全城鎮。禁止械鬥，聚集了各行各業的 NPC 補給大師。"},
@@ -31,7 +34,7 @@ MAPS_DATA = {
 }
 
 def get_maps_carousel(p):
-    """【世界傳送廊 v2.5】動態把地圖包裝成可左右滑動的 Carousel 按鈕圖卡"""
+    """【世界傳送廊 v2.6】動態把地圖包裝成可左右滑動的 Carousel 按鈕圖卡"""
     map_list = list(MAPS_DATA.items())
     columns = []
     p_level = p["level"]
@@ -70,7 +73,7 @@ def get_maps_carousel(p):
     return {"type": "carousel", "contents": columns}
 
 def change_map(p, target_map):
-    """處理時空傳送邏輯，精準切碎口令"""
+    """處理時空傳送邏輯，支援副本自動索敵掛載"""
     target_map = target_map.replace("前往", "").replace("傳送", "").replace(" ", "").strip()
 
     if target_map not in MAPS_DATA:
@@ -88,6 +91,7 @@ def change_map(p, target_map):
 
     p["current_map"] = target_map
 
+    # 📌 關鍵修復：傳送時自動生成對應地圖或副本的敵人，絕對不卡怪！
     if target_map == "世界Boss":
         import challenge_system
         boss_hp = challenge_system.check_boss_rebirth_and_get_hp()
@@ -97,7 +101,8 @@ def change_map(p, target_map):
             "drop_item": "舊神支配者之眼", "env": "🔮 魔能潮汐 (全服大混戰，法術增幅異常狂暴)", "is_world_boss": True
         }
     else:
-        p["enemy"] = None
+        p["enemy"] = monsters.generate_random_monster(target_map)
 
     db_core.save_player(p)
-    return f"✨ 🔮 傳送成功！時空法陣光芒收束，你已順利跨越時空抵達 ── 📍【{target_map}】！\n\n{info['desc']}"
+    return f"✨ 🔮 傳送成功！時空法陣光芒收束，你已順利跨越時空抵達 ── 📍【{target_map}】！\n\n{info['desc']}\n\n⚔️ 警報！前方遭遇了守關強敵【{p['enemy']['name']}】，請發動攻擊！"
+# === END OF FILE ===
