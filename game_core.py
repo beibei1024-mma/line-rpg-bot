@@ -1,4 +1,4 @@
-# game_core.py - 皇家分流主控台 v4.7 (逃跑路由最高優先級版)
+# game_core.py - 皇家分流主控台 v4.8 (完整黑市與逃跑優先版)
 
 import random
 import datetime
@@ -215,12 +215,12 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "時空傳送結果", card_data)
         return
 
-    # 📌 15. 【逃跑指令】最高優先級攔截（確保點擊逃跑絕不誤判成攻擊）
+    # 15. 【逃跑指令】最高優先級攔截
     if user_msg == "逃跑":
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
         return
 
-    # 16. 主城安全區指令導流
+    # 16. 主城安全區指令導流（黑市與商店最高優先）
     if current_loc == "主城":
         if user_msg == "黑市":
             line_bot_api.reply_message(
@@ -315,7 +315,7 @@ def process_game_logic(event, line_bot_api, configuration):
             )
             return
 
-    # 17. 戰鬥中行動（攻擊、尋怪、技能）
+    # 17. 戰鬥中行動
     if p["enemy"] is not None:
         battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
         return
