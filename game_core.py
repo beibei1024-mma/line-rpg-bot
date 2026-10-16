@@ -1,4 +1,4 @@
-# game_core.py - 皇家分流主控台 v4.4 (完美路由與防呆版)
+# game_core.py - 皇家分流主控台 v4.5 (黑市與安全區路由優先版)
 
 import random
 import datetime
@@ -14,6 +14,7 @@ import battle_core
 import challenge_system
 import forge_system
 import jobs_system
+import dynamic_market
 
 CITY_ONLY_COMMANDS = {
     "冒險商店", "購買", "黑市", "黑市購買", "簽到",
@@ -22,7 +23,6 @@ CITY_ONLY_COMMANDS = {
 
 
 def _reply_flex(configuration, reply_token, alt_text, card_data):
-    """統一安全發送 Flex Message + QuickReply"""
     qr = card_data.get("quick_reply")
     if hasattr(qr, "to_dict"):
         qr = qr.to_dict()
@@ -216,27 +216,22 @@ def process_game_logic(event, line_bot_api, configuration):
         _reply_flex(configuration, event.reply_token, "時空傳送結果", card_data)
         return
 
-    # 15. 戰鬥中行動
-    if p["enemy"] is not None:
-        battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
-        return
-    if user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
-        battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
-        return
-
-    # 16. 野外限制隔離牆
-    is_city_cmd = any(user_msg.startswith(cmd) or user_msg == cmd for cmd in CITY_ONLY_COMMANDS)
-    if is_city_cmd and current_loc != "主城":
-        warn_text = (
-            "❌ 鎖定限制！你目前位於野外【" + current_loc + "】。\n"
-            "野外無法開啟商店、簽到、工坊或發起爬塔！\n"
-            "請先點擊小圖標【🦅 飛回城鎮】或輸入【回城】！"
-        )
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=warn_text))
-        return
-
-    # 17. 主城安全區指令導流
+    # 15. 主城安全區指令導流（黑市與商店優先於戰鬥導流）
     if current_loc == "主城":
+        if user_msg == "黑市":
+            line_bot_api.reply_message(
+                event.reply_token,
+                FlexSendMessage(alt_text="動態黑市", contents=dynamic_market.get_market_flex(p))
+            )
+            return
+
+        if user_msg.startswith("黑市購買"):
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=dynamic_market.execute_market_buy(p, user_msg))
+            )
+            return
+
         if user_msg == "冒險商店":
             line_bot_api.reply_message(
                 event.reply_token,
@@ -315,6 +310,25 @@ def process_game_logic(event, line_bot_api, configuration):
                 TextSendMessage(text="❌ 主城安全區禁止械鬥！請點擊小圖標【🚪 出城冒險】傳送至野外獵怪！")
             )
             return
+
+    # 16. 戰鬥中行動
+    if p["enemy"] is not None:
+        battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
+        return
+    if user_msg.startswith("使用技能") or user_msg == "使用技能防禦":
+        battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
+        return
+
+    # 17. 野外限制隔離牆
+    is_city_cmd = any(user_msg.startswith(cmd) or user_msg == cmd for cmd in CITY_ONLY_COMMANDS)
+    if is_city_cmd and current_loc != "主城":
+        warn_text = (
+            "❌ 鎖定限制！你目前位於野外【" + current_loc + "】。\n"
+            "野外無法開啟商店、簽到、工坊或發起爬塔！\n"
+            "請先點擊小圖標【🦅 飛回城鎮】或輸入【回城】！"
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=warn_text))
+        return
 
     battle_core.process_battle_logic(event, line_bot_api, p, user_msg, configuration)
 # === END OF FILE ===
